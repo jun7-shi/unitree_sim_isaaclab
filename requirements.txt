@@ -6,3 +6,4 @@ onnx
 pynput==1.8.1
 aiortc
 aiohttp
+numpy>=1.21,<2
