@@ -1,11 +1,8 @@
 # ================================
 # Python
 # ================================
-*/__pycache__
-*/__pycache__/
-__pycache__
-__pycache__
 __pycache__/
+*/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -83,8 +80,6 @@ devel/
 build/
 install/
 .catkin_workspace
-*.pyc
-
 # Gazebo 相关
 *.world~
 models/
