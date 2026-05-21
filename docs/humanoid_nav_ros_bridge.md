@@ -5,7 +5,7 @@ HUM-41.
 
 ## G1 Nav Bridge
 
-Launch the G1 navigation task with the ROS2 TF/odometry and head RGBD
+Launch the G1 navigation task with the ROS2 clock, TF/odometry, and head RGBD
 PointCloud2 bridges enabled:
 
 ```bash
@@ -17,6 +17,7 @@ conda run -n unitree_sim_lab python sim_main.py \
   --task Isaac-Move-Cylinder-G129-Dex1-Wholebody-Nav \
   --robot_type g129 \
   --enable_dex1_dds \
+  --enable_nav_ros_clock \
   --enable_nav_ros_tf_odom \
   --enable_nav_ros_pointcloud \
   --headless
@@ -26,11 +27,27 @@ Use `--headless` instead of `--no_render` for the PointCloud2 bridge. The
 camera `depth_pcl` publisher depends on Isaac Sim render product updates, and
 `--no_render` intentionally suppresses regular rendering.
 
-The bridge uses Isaac Sim's built-in `isaacsim.ros2.bridge` OmniGraph nodes:
+The bridge uses Isaac Sim's built-in `isaacsim.ros2.bridge` OmniGraph nodes and
+matches NVIDIA's scripted equivalents for the UI graph shortcuts:
+
+```text
+Clock shortcut:
+OnPlaybackTick -> IsaacReadSimulationTime -> ROS2PublishClock
+
+Camera shortcut:
+OnPlaybackTick -> OgnIsaacRunOneSimulationFrame
+  -> IsaacCreateRenderProduct
+  -> ROS2CameraInfoHelper
+  -> ROS2CameraHelper(type=depth_pcl)
+```
+
+ROS contract:
 
 ```text
 map -> odom -> base_link
+/clock rosgraph_msgs/Clock
 /odom nav_msgs/Odometry
+/g1/head_rgbd/camera_info sensor_msgs/CameraInfo
 /g1/head_rgbd/points sensor_msgs/PointCloud2
 ```
 
@@ -40,8 +57,10 @@ Default frame and topic contract:
 map_frame: map
 odom_frame: odom
 base_frame: base_link
+clock_topic: /clock
 odom_topic: /odom
 tf_topic: tf
+camera_info_topic: /g1/head_rgbd/camera_info
 pointcloud_topic: /g1/head_rgbd/points
 pointcloud_frame: g1_head_d435_depth_optical_frame
 ```
@@ -52,9 +71,11 @@ Run these from a ROS 2 Humble shell while Isaac Sim is running:
 
 ```bash
 ros2 run tf2_ros tf2_echo map base_link
+ros2 topic hz /clock
 ros2 topic hz /odom
 ros2 topic echo --once /odom.header.frame_id
 ros2 topic echo --once /odom.child_frame_id
+ros2 topic echo --once /g1/head_rgbd/camera_info.header.frame_id
 ros2 topic hz /g1/head_rgbd/points
 ros2 topic echo --once /g1/head_rgbd/points.header.frame_id
 ```
@@ -64,6 +85,7 @@ Expected values:
 ```text
 /odom.header.frame_id: odom
 /odom.child_frame_id: base_link
+/g1/head_rgbd/camera_info.header.frame_id: g1_head_d435_depth_optical_frame
 /g1/head_rgbd/points.header.frame_id: g1_head_d435_depth_optical_frame
 ```
 

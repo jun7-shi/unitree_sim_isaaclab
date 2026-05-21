@@ -16,7 +16,9 @@ class G1NavPointCloudBridgeConfig:
     camera_name: str = "front_camera"
     camera_prim_path: str | None = None
     pointcloud_topic: str = "/g1/head_rgbd/points"
+    camera_info_topic: str = "/g1/head_rgbd/camera_info"
     frame_id: str = "g1_head_d435_depth_optical_frame"
+    node_namespace: str = ""
     width: int = 640
     height: int = 480
 
@@ -42,7 +44,6 @@ def create_g1_nav_pointcloud_graph(
 ) -> dict[str, str]:
     """Create the ROS2 PointCloud2 OmniGraph for the G1 head RGBD camera."""
     import omni.graph.core as og
-    import usdrt.Sdf
 
     config = config or G1NavPointCloudBridgeConfig()
     _enable_ros2_bridge_extension()
@@ -55,41 +56,55 @@ def create_g1_nav_pointcloud_graph(
             "graph_path": config.graph_path,
             "camera_prim_path": camera_prim_path,
             "pointcloud_topic": config.pointcloud_topic,
+            "camera_info_topic": config.camera_info_topic,
             "frame_id": config.frame_id,
         }
 
     keys = og.Controller.Keys
     og.Controller.edit(
-        {
-            "graph_path": config.graph_path,
-            "pipeline_stage": og.GraphPipelineStage.GRAPH_PIPELINE_STAGE_ONDEMAND,
-        },
+        {"graph_path": config.graph_path, "evaluator_name": "execution"},
         {
             keys.CREATE_NODES: [
-                ("PhysicsStep", "isaacsim.core.nodes.OnPhysicsStep"),
+                ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
                 ("Context", "isaacsim.ros2.bridge.ROS2Context"),
                 (
                     "CreateRenderProduct",
                     "isaacsim.core.nodes.IsaacCreateRenderProduct",
                 ),
+                ("RunOnce", "isaacsim.core.nodes.OgnIsaacRunOneSimulationFrame"),
+                ("CameraInfoPublish", "isaacsim.ros2.bridge.ROS2CameraInfoHelper"),
                 ("DepthPointCloud", "isaacsim.ros2.bridge.ROS2CameraHelper"),
             ],
             keys.SET_VALUES: [
-                (
-                    "CreateRenderProduct.inputs:cameraPrim",
-                    [usdrt.Sdf.Path(camera_prim_path)],
-                ),
+                ("CreateRenderProduct.inputs:cameraPrim", camera_prim_path),
                 ("CreateRenderProduct.inputs:width", config.width),
                 ("CreateRenderProduct.inputs:height", config.height),
+                ("CameraInfoPublish.inputs:topicName", config.camera_info_topic),
+                ("CameraInfoPublish.inputs:frameId", config.frame_id),
+                ("CameraInfoPublish.inputs:nodeNamespace", config.node_namespace),
+                ("CameraInfoPublish.inputs:resetSimulationTimeOnStop", True),
                 ("DepthPointCloud.inputs:topicName", config.pointcloud_topic),
                 ("DepthPointCloud.inputs:type", "depth_pcl"),
                 ("DepthPointCloud.inputs:frameId", config.frame_id),
-                ("DepthPointCloud.inputs:resetSimulationTimeOnStop", False),
+                ("DepthPointCloud.inputs:nodeNamespace", config.node_namespace),
+                ("DepthPointCloud.inputs:resetSimulationTimeOnStop", True),
             ],
             keys.CONNECT: [
                 (
-                    "PhysicsStep.outputs:step",
+                    "OnPlaybackTick.outputs:tick",
+                    "RunOnce.inputs:execIn",
+                ),
+                (
+                    "RunOnce.outputs:step",
                     "CreateRenderProduct.inputs:execIn",
+                ),
+                (
+                    "CreateRenderProduct.outputs:execOut",
+                    "CameraInfoPublish.inputs:execIn",
+                ),
+                (
+                    "CreateRenderProduct.outputs:renderProductPath",
+                    "CameraInfoPublish.inputs:renderProductPath",
                 ),
                 (
                     "CreateRenderProduct.outputs:execOut",
@@ -99,6 +114,7 @@ def create_g1_nav_pointcloud_graph(
                     "CreateRenderProduct.outputs:renderProductPath",
                     "DepthPointCloud.inputs:renderProductPath",
                 ),
+                ("Context.outputs:context", "CameraInfoPublish.inputs:context"),
                 ("Context.outputs:context", "DepthPointCloud.inputs:context"),
             ],
         },
@@ -108,5 +124,6 @@ def create_g1_nav_pointcloud_graph(
         "graph_path": config.graph_path,
         "camera_prim_path": camera_prim_path,
         "pointcloud_topic": config.pointcloud_topic,
+        "camera_info_topic": config.camera_info_topic,
         "frame_id": config.frame_id,
     }

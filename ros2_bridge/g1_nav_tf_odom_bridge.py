@@ -73,13 +73,10 @@ def create_g1_nav_tf_odom_graph(
 
     keys = og.Controller.Keys
     og.Controller.edit(
-        {
-            "graph_path": config.graph_path,
-            "pipeline_stage": og.GraphPipelineStage.GRAPH_PIPELINE_STAGE_ONDEMAND,
-        },
+        {"graph_path": config.graph_path, "evaluator_name": "execution"},
         {
             keys.CREATE_NODES: [
-                ("PhysicsStep", "isaacsim.core.nodes.OnPhysicsStep"),
+                ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
                 ("Context", "isaacsim.ros2.bridge.ROS2Context"),
                 ("ReadSimTime", "isaacsim.core.nodes.IsaacReadSimulationTime"),
                 ("ComputeOdometry", "isaacsim.core.nodes.IsaacComputeOdometry"),
@@ -107,8 +104,8 @@ def create_g1_nav_tf_odom_graph(
                 ("TFOdomBase.inputs:childFrameId", config.base_frame),
             ],
             keys.CONNECT: [
-                ("PhysicsStep.outputs:step", "TFMapOdom.inputs:execIn"),
-                ("PhysicsStep.outputs:step", "ComputeOdometry.inputs:execIn"),
+                ("OnPlaybackTick.outputs:tick", "TFMapOdom.inputs:execIn"),
+                ("OnPlaybackTick.outputs:tick", "ComputeOdometry.inputs:execIn"),
                 ("Context.outputs:context", "PublishOdometry.inputs:context"),
                 ("Context.outputs:context", "TFMapOdom.inputs:context"),
                 ("Context.outputs:context", "TFOdomBase.inputs:context"),

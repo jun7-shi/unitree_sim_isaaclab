@@ -53,6 +53,9 @@ parser.add_argument("--profile_interval", type=int, default=500, help="performan
 parser.add_argument("--model_path", type=str, default="assets/model/policy.onnx", help="model path")
 parser.add_argument("--reward_interval", type=int, default=10, help="step interval for reward calculation")
 parser.add_argument("--enable_wholebody_dds", action="store_true", default=False, help="enable wh dds")
+parser.add_argument("--enable_nav_ros_clock", action="store_true", default=False, help="enable ROS2 /clock bridge for humanoid navigation")
+parser.add_argument("--nav_ros_clock_graph_path", type=str, default="/ActionGraph/HumanoidNavClock", help="OmniGraph path for the navigation ROS2 clock bridge")
+parser.add_argument("--nav_ros_clock_topic", type=str, default="/clock", help="ROS2 clock topic for Nav2 use_sim_time nodes")
 parser.add_argument("--enable_nav_ros_tf_odom", action="store_true", default=False, help="enable ROS2 TF and odometry bridge for humanoid navigation")
 parser.add_argument("--nav_ros_graph_path", type=str, default="/ActionGraph/HumanoidNavTfOdom", help="OmniGraph path for the navigation ROS2 TF/odom bridge")
 parser.add_argument("--nav_ros_robot_prim_path", type=str, default=None, help="explicit robot prim path for the navigation ROS2 TF/odom bridge")
@@ -65,7 +68,9 @@ parser.add_argument("--enable_nav_ros_pointcloud", action="store_true", default=
 parser.add_argument("--nav_ros_pointcloud_graph_path", type=str, default="/ActionGraph/HumanoidNavPointCloud", help="OmniGraph path for the navigation ROS2 PointCloud2 bridge")
 parser.add_argument("--nav_ros_camera_prim_path", type=str, default=None, help="explicit camera prim path for the navigation ROS2 PointCloud2 bridge")
 parser.add_argument("--nav_ros_pointcloud_topic", type=str, default="/g1/head_rgbd/points", help="ROS2 PointCloud2 topic for the G1 head RGBD camera")
+parser.add_argument("--nav_ros_camera_info_topic", type=str, default="/g1/head_rgbd/camera_info", help="ROS2 CameraInfo topic for the G1 head RGBD camera")
 parser.add_argument("--nav_ros_camera_frame", type=str, default="g1_head_d435_depth_optical_frame", help="ROS2 frame id for the G1 head RGBD PointCloud2")
+parser.add_argument("--nav_ros_node_namespace", type=str, default="", help="ROS2 node namespace for humanoid navigation camera publishers")
 parser.add_argument("--nav_ros_camera_width", type=int, default=640, help="render product width for the G1 head RGBD PointCloud2")
 parser.add_argument("--nav_ros_camera_height", type=int, default=480, help="render product height for the G1 head RGBD PointCloud2")
 
@@ -373,6 +378,23 @@ def main():
         )
     env.sim.reset()
     env.reset()
+    if args_cli.enable_nav_ros_clock:
+        try:
+            from ros2_bridge.g1_nav_clock_bridge import (
+                G1NavClockBridgeConfig,
+                create_g1_nav_clock_graph,
+            )
+
+            clock_info = create_g1_nav_clock_graph(
+                G1NavClockBridgeConfig(
+                    graph_path=args_cli.nav_ros_clock_graph_path,
+                    clock_topic=args_cli.nav_ros_clock_topic,
+                )
+            )
+            print(f"[nav_ros] Clock bridge enabled: {clock_info}")
+        except Exception as e:
+            print(f"[nav_ros] failed to enable clock bridge: {e}")
+            return
     if args_cli.enable_nav_ros_tf_odom:
         try:
             from ros2_bridge.g1_nav_tf_odom_bridge import (
@@ -409,7 +431,9 @@ def main():
                     graph_path=args_cli.nav_ros_pointcloud_graph_path,
                     camera_prim_path=args_cli.nav_ros_camera_prim_path,
                     pointcloud_topic=args_cli.nav_ros_pointcloud_topic,
+                    camera_info_topic=args_cli.nav_ros_camera_info_topic,
                     frame_id=args_cli.nav_ros_camera_frame,
+                    node_namespace=args_cli.nav_ros_node_namespace,
                     width=args_cli.nav_ros_camera_width,
                     height=args_cli.nav_ros_camera_height,
                 ),
@@ -417,6 +441,21 @@ def main():
             print(f"[nav_ros] PointCloud2 bridge enabled: {pointcloud_info}")
         except Exception as e:
             print(f"[nav_ros] failed to enable PointCloud2 bridge: {e}")
+            return
+    if (
+        args_cli.enable_nav_ros_clock
+        or args_cli.enable_nav_ros_tf_odom
+        or args_cli.enable_nav_ros_pointcloud
+    ):
+        try:
+            from ros2_bridge.g1_nav_clock_bridge import (
+                ensure_nav_ros_timeline_playing,
+            )
+
+            started_timeline = ensure_nav_ros_timeline_playing()
+            print(f"[nav_ros] timeline playback active: started={started_timeline}")
+        except Exception as e:
+            print(f"[nav_ros] failed to start timeline playback: {e}")
             return
     
     # create simplified control configuration
