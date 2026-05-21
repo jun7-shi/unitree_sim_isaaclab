@@ -53,6 +53,14 @@ parser.add_argument("--profile_interval", type=int, default=500, help="performan
 parser.add_argument("--model_path", type=str, default="assets/model/policy.onnx", help="model path")
 parser.add_argument("--reward_interval", type=int, default=10, help="step interval for reward calculation")
 parser.add_argument("--enable_wholebody_dds", action="store_true", default=False, help="enable wh dds")
+parser.add_argument("--enable_nav_ros_tf_odom", action="store_true", default=False, help="enable ROS2 TF and odometry bridge for humanoid navigation")
+parser.add_argument("--nav_ros_graph_path", type=str, default="/ActionGraph/HumanoidNavTfOdom", help="OmniGraph path for the navigation ROS2 TF/odom bridge")
+parser.add_argument("--nav_ros_robot_prim_path", type=str, default=None, help="explicit robot prim path for the navigation ROS2 TF/odom bridge")
+parser.add_argument("--nav_ros_map_frame", type=str, default="map", help="Nav2 map frame id")
+parser.add_argument("--nav_ros_odom_frame", type=str, default="odom", help="Nav2 odom frame id")
+parser.add_argument("--nav_ros_base_frame", type=str, default="base_link", help="Nav2 base frame id")
+parser.add_argument("--nav_ros_odom_topic", type=str, default="/odom", help="ROS2 odometry topic for Nav2")
+parser.add_argument("--nav_ros_tf_topic", type=str, default="tf", help="ROS2 TF topic for Nav2")
 
 parser.add_argument("--physics_dt", type=float, default=None, help="physics time step, e.g., 0.005")
 parser.add_argument("--render_interval", type=int, default=None, help="render interval steps (>=1)")
@@ -358,6 +366,29 @@ def main():
         )
     env.sim.reset()
     env.reset()
+    if args_cli.enable_nav_ros_tf_odom:
+        try:
+            from ros2_bridge.g1_nav_tf_odom_bridge import (
+                G1NavTfOdomBridgeConfig,
+                create_g1_nav_tf_odom_graph,
+            )
+
+            bridge_info = create_g1_nav_tf_odom_graph(
+                env,
+                G1NavTfOdomBridgeConfig(
+                    graph_path=args_cli.nav_ros_graph_path,
+                    robot_prim_path=args_cli.nav_ros_robot_prim_path,
+                    map_frame=args_cli.nav_ros_map_frame,
+                    odom_frame=args_cli.nav_ros_odom_frame,
+                    base_frame=args_cli.nav_ros_base_frame,
+                    odom_topic=args_cli.nav_ros_odom_topic,
+                    tf_topic=args_cli.nav_ros_tf_topic,
+                ),
+            )
+            print(f"[nav_ros] TF/odom bridge enabled: {bridge_info}")
+        except Exception as e:
+            print(f"[nav_ros] failed to enable TF/odom bridge: {e}")
+            return
     
     # create simplified control configuration
     try:    
