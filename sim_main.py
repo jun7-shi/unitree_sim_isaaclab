@@ -61,6 +61,13 @@ parser.add_argument("--nav_ros_odom_frame", type=str, default="odom", help="Nav2
 parser.add_argument("--nav_ros_base_frame", type=str, default="base_link", help="Nav2 base frame id")
 parser.add_argument("--nav_ros_odom_topic", type=str, default="/odom", help="ROS2 odometry topic for Nav2")
 parser.add_argument("--nav_ros_tf_topic", type=str, default="tf", help="ROS2 TF topic for Nav2")
+parser.add_argument("--enable_nav_ros_pointcloud", action="store_true", default=False, help="enable ROS2 PointCloud2 bridge for the G1 head RGBD camera")
+parser.add_argument("--nav_ros_pointcloud_graph_path", type=str, default="/ActionGraph/HumanoidNavPointCloud", help="OmniGraph path for the navigation ROS2 PointCloud2 bridge")
+parser.add_argument("--nav_ros_camera_prim_path", type=str, default=None, help="explicit camera prim path for the navigation ROS2 PointCloud2 bridge")
+parser.add_argument("--nav_ros_pointcloud_topic", type=str, default="/g1/head_rgbd/points", help="ROS2 PointCloud2 topic for the G1 head RGBD camera")
+parser.add_argument("--nav_ros_camera_frame", type=str, default="g1_head_d435_depth_optical_frame", help="ROS2 frame id for the G1 head RGBD PointCloud2")
+parser.add_argument("--nav_ros_camera_width", type=int, default=640, help="render product width for the G1 head RGBD PointCloud2")
+parser.add_argument("--nav_ros_camera_height", type=int, default=480, help="render product height for the G1 head RGBD PointCloud2")
 
 parser.add_argument("--physics_dt", type=float, default=None, help="physics time step, e.g., 0.005")
 parser.add_argument("--render_interval", type=int, default=None, help="render interval steps (>=1)")
@@ -388,6 +395,28 @@ def main():
             print(f"[nav_ros] TF/odom bridge enabled: {bridge_info}")
         except Exception as e:
             print(f"[nav_ros] failed to enable TF/odom bridge: {e}")
+            return
+    if args_cli.enable_nav_ros_pointcloud:
+        try:
+            from ros2_bridge.g1_nav_pointcloud_bridge import (
+                G1NavPointCloudBridgeConfig,
+                create_g1_nav_pointcloud_graph,
+            )
+
+            pointcloud_info = create_g1_nav_pointcloud_graph(
+                env,
+                G1NavPointCloudBridgeConfig(
+                    graph_path=args_cli.nav_ros_pointcloud_graph_path,
+                    camera_prim_path=args_cli.nav_ros_camera_prim_path,
+                    pointcloud_topic=args_cli.nav_ros_pointcloud_topic,
+                    frame_id=args_cli.nav_ros_camera_frame,
+                    width=args_cli.nav_ros_camera_width,
+                    height=args_cli.nav_ros_camera_height,
+                ),
+            )
+            print(f"[nav_ros] PointCloud2 bridge enabled: {pointcloud_info}")
+        except Exception as e:
+            print(f"[nav_ros] failed to enable PointCloud2 bridge: {e}")
             return
     
     # create simplified control configuration
