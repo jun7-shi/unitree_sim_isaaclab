@@ -19,8 +19,12 @@ conda run -n unitree_sim_lab python sim_main.py \
   --enable_dex1_dds \
   --enable_nav_ros_tf_odom \
   --enable_nav_ros_pointcloud \
-  --no_render
+  --headless
 ```
+
+Use `--headless` instead of `--no_render` for the PointCloud2 bridge. The
+camera `depth_pcl` publisher depends on Isaac Sim render product updates, and
+`--no_render` intentionally suppresses regular rendering.
 
 The bridge uses Isaac Sim's built-in `isaacsim.ros2.bridge` OmniGraph nodes:
 

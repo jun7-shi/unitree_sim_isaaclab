@@ -38,6 +38,8 @@ class G1NavPointCloudBridgeStaticTests(unittest.TestCase):
         )
 
         self.assertIn("--enable_nav_ros_pointcloud", doc)
+        self.assertIn("--headless", doc)
+        self.assertNotIn("  --no_render", doc)
         self.assertIn("/g1/head_rgbd/points", doc)
         self.assertIn("sensor_msgs/PointCloud2", doc)
         self.assertIn("ros2 topic hz /g1/head_rgbd/points", doc)
