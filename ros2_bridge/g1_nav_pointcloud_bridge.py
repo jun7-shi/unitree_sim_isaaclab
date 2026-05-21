@@ -60,10 +60,13 @@ def create_g1_nav_pointcloud_graph(
 
     keys = og.Controller.Keys
     og.Controller.edit(
-        {"graph_path": config.graph_path, "evaluator_name": "execution"},
+        {
+            "graph_path": config.graph_path,
+            "pipeline_stage": og.GraphPipelineStage.GRAPH_PIPELINE_STAGE_ONDEMAND,
+        },
         {
             keys.CREATE_NODES: [
-                ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
+                ("PhysicsStep", "isaacsim.core.nodes.OnPhysicsStep"),
                 ("Context", "isaacsim.ros2.bridge.ROS2Context"),
                 (
                     "CreateRenderProduct",
@@ -85,7 +88,7 @@ def create_g1_nav_pointcloud_graph(
             ],
             keys.CONNECT: [
                 (
-                    "OnPlaybackTick.outputs:tick",
+                    "PhysicsStep.outputs:step",
                     "CreateRenderProduct.inputs:execIn",
                 ),
                 (

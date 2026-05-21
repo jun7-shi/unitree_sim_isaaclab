@@ -15,6 +15,8 @@ class G1NavRosBridgeStaticTests(unittest.TestCase):
         self.assertIn("ROS2PublishOdometry", bridge)
         self.assertIn("ROS2PublishRawTransformTree", bridge)
         self.assertIn("IsaacComputeOdometry", bridge)
+        self.assertIn("isaacsim.core.nodes.OnPhysicsStep", bridge)
+        self.assertNotIn("omni.graph.action.OnPlaybackTick", bridge)
         self.assertIn('map_frame: str = "map"', bridge)
         self.assertIn('odom_frame: str = "odom"', bridge)
         self.assertIn('base_frame: str = "base_link"', bridge)

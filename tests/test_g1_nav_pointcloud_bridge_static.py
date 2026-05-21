@@ -14,6 +14,8 @@ class G1NavPointCloudBridgeStaticTests(unittest.TestCase):
         self.assertIn("isaacsim.ros2.bridge", bridge)
         self.assertIn("ROS2CameraHelper", bridge)
         self.assertIn("IsaacCreateRenderProduct", bridge)
+        self.assertIn("isaacsim.core.nodes.OnPhysicsStep", bridge)
+        self.assertNotIn("omni.graph.action.OnPlaybackTick", bridge)
         self.assertIn('pointcloud_topic: str = "/g1/head_rgbd/points"', bridge)
         self.assertIn(
             'frame_id: str = "g1_head_d435_depth_optical_frame"',

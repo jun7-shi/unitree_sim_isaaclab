@@ -31,7 +31,8 @@ class CameraBaseCfg:
         clipping_range: tuple = (0.1, 1.0e5),
         pos_offset: tuple = (0, 0.0, 0),
         rot_offset: tuple = (0.5, -0.5, 0.5, -0.5),
-        data_types: list = None
+        data_types: list = None,
+        spawn_camera: bool = True,
     ) -> CameraCfg:
         """get the front camera configuration
         
@@ -47,6 +48,7 @@ class CameraBaseCfg:
             pos_offset: position offset (x, y, z)
             rot_offset: rotation offset quaternion
             data_types: data type list
+            spawn_camera: spawn a camera prim if one is not already present
             
         Returns:
             CameraCfg: camera configuration
@@ -60,11 +62,15 @@ class CameraBaseCfg:
             height=height,
             width=width,
             data_types=data_types,
-            spawn=sim_utils.PinholeCameraCfg(
-                focal_length=focal_length,
-                focus_distance=focus_distance,
-                horizontal_aperture=horizontal_aperture,
-                clipping_range=clipping_range
+            spawn=(
+                sim_utils.PinholeCameraCfg(
+                    focal_length=focal_length,
+                    focus_distance=focus_distance,
+                    horizontal_aperture=horizontal_aperture,
+                    clipping_range=clipping_range
+                )
+                if spawn_camera
+                else None
             ),
             offset=CameraCfg.OffsetCfg(
                 pos=pos_offset,
@@ -100,6 +106,7 @@ class CameraPresets:
             focus_distance=400.0,
             horizontal_aperture=20.0,
             clipping_range=(0.05, 5.0),
+            spawn_camera=False,
         )
     @classmethod
     def h12_front_camera(cls) -> CameraCfg:
