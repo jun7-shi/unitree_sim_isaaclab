@@ -88,6 +88,20 @@ class CameraPresets:
         """front camera configuration"""
         return CameraBaseCfg.get_camera_config()
     @classmethod
+    def g1_nav_depth_camera(cls) -> CameraCfg:
+        """RGBD camera mounted on the package-owned G1 navigation USD."""
+        return CameraBaseCfg.get_camera_config(
+            prim_path="/World/envs/env_.*/Robot/d435_link/head_d435_depth_camera",
+            height=480,
+            width=640,
+            update_period=0.02,
+            data_types=["rgb", "depth"],
+            focal_length=18.0,
+            focus_distance=400.0,
+            horizontal_aperture=20.0,
+            clipping_range=(0.05, 5.0),
+        )
+    @classmethod
     def h12_front_camera(cls) -> CameraCfg:
         """front camera configuration"""
         return CameraBaseCfg.get_camera_config(prim_path = "/World/envs/env_.*/Robot/camera_link/front_cam")
@@ -138,7 +152,7 @@ class CameraPresets:
             clipping_range=(0.1, 1.0e5),
             pos_offset=(-0.02541028, 0.045, 0.135),
             rot_offset=(-0.34202, 0.93969, 0, 0),
-        ) 
+        )
     @classmethod
     def left_dex3_wrist_camera(cls) -> CameraCfg:
         """left wrist camera configuration"""
@@ -170,7 +184,7 @@ class CameraPresets:
             clipping_range=(0.1, 1.0e5),
             pos_offset=(-0.04012, 0.07441 ,0.15711),
             rot_offset=(0.00539,0.86024,0.0424, 0.50809),
-        ) 
+        )
     
     @classmethod
     def left_inspire_wrist_camera(cls) -> CameraCfg:
@@ -203,4 +217,4 @@ class CameraPresets:
             clipping_range=(0.1, 1.0e5),
             pos_offset=(-0.04012, 0.07441 ,0.15711),
             rot_offset=(0.00539,0.86024,0.0424, 0.50809),
-        ) 
+        )

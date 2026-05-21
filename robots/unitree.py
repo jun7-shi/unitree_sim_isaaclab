@@ -8,6 +8,17 @@ from isaaclab.assets.articulation import ArticulationCfg
 from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 import os
 project_root = os.environ.get("PROJECT_ROOT")
+DEFAULT_G1_NAV_USD = (
+    "/data/jun7.shi/code/poc/IsaacSim-ros_workspaces/.worktrees/"
+    "nav2-humanoid-navigation/humble_ws/src/navigation/humanoid_navigation/"
+    "assets/g1_nav/g1_29dof_with_dex1_nav_depth.usd"
+)
+
+
+def get_g1_nav_usd_path() -> str:
+    return os.environ.get("HUMANOID_NAVIGATION_G1_NAV_USD", DEFAULT_G1_NAV_USD)
+
+
 G129_CFG_WITH_DEX3_BASE_FIX = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=f"{project_root}/assets/robots/g1-29dof-dex3-base-fix-usd/g1_29dof_with_dex3_base_fix.usd",
@@ -695,6 +706,13 @@ G129_CFG_WITH_DEX1_WHOLEBODY = ArticulationCfg(
             armature=None,
         ),
     },
+)
+
+
+G129_CFG_WITH_DEX1_WHOLEBODY_NAV = G129_CFG_WITH_DEX1_WHOLEBODY.replace(
+    spawn=G129_CFG_WITH_DEX1_WHOLEBODY.spawn.replace(
+        usd_path=get_g1_nav_usd_path()
+    )
 )
 
 

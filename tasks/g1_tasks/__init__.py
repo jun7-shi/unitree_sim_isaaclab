@@ -19,6 +19,7 @@ from . import pick_redblock_into_drawer_g1_29dof_dex1
 from . import pick_redblock_into_drawer_g1_29dof_dex3
 from . import pick_place_redblock_g1_29dof_inspire
 from . import move_cylinder_g1_29dof_dex1_wholebody
+from . import move_cylinder_g1_29dof_dex1_wholebody_nav
 from . import move_cylinder_g1_29dof_dex3_wholebody
 from . import move_cylinder_g1_29dof_inspire_wholebody
 
@@ -32,6 +33,7 @@ __all__ = [
         "pick_place_redblock_g1_29dof_inspire",
         "pick_place_cylinder_g1_29dof_inspire",
         "move_cylinder_g1_29dof_dex1_wholebody",
+        "move_cylinder_g1_29dof_dex1_wholebody_nav",
         "move_cylinder_g1_29dof_dex3_wholebody",
         "move_cylinder_g1_29dof_inspire_wholebody"
 ]
