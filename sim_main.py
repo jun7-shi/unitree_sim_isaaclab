@@ -22,6 +22,11 @@ from isaaclab.app import AppLauncher
 
 from teleimager.image_server import run_isaacsim_server
 from dds.dds_create import create_dds_objects,create_dds_objects_replay
+from ros2_bridge.g1_nav_static_map_exporter import (
+    DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
+    DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+    resolve_nav_static_map_scope,
+)
 # add command line arguments
 parser = argparse.ArgumentParser(description="Unitree Simulation")
 parser.add_argument("--task", type=str, default="Isaac-PickPlace-G129-Head-Waist-Fix", help="task name")
@@ -85,9 +90,9 @@ parser.add_argument("--export_nav_static_map", type=str, default="", help="expor
 parser.add_argument("--nav_static_map_cell_size", type=float, default=0.05, help="cell size in meters for --export_nav_static_map")
 parser.add_argument("--nav_static_map_origin", type=float, nargs=3, default=None, metavar=("X", "Y", "Z"), help="free start point for Isaac Sim occupancy map generation; defaults to the robot start x/y with z=0.1")
 parser.add_argument("--nav_static_map_z_bounds", type=float, nargs=2, default=(0.05, 1.2), metavar=("MIN_Z", "MAX_Z"), help="height slice for static occupancy map generation")
-parser.add_argument("--nav_static_map_bound_prim", type=str, default="/World/envs/env_0", help="USD prim whose world bounds define the XY occupancy map extent")
+parser.add_argument("--nav_static_map_bound_prim", type=str, default=DEFAULT_NAV_STATIC_MAP_BOUND_PRIM, help="USD prim whose world bounds define the XY occupancy map extent")
 parser.add_argument("--nav_static_map_padding", type=float, default=0.25, help="extra XY padding around --nav_static_map_bound_prim")
-parser.add_argument("--nav_static_map_exclude_prims", type=str, nargs="*", default=["/World/envs/env_0/Robot", "/World/envs/env_0/Object"], help="prim paths to temporarily deactivate while exporting the static map")
+parser.add_argument("--nav_static_map_exclude_prims", type=str, nargs="*", default=list(DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS), help="prim paths to temporarily deactivate while exporting the static map")
 parser.add_argument("--nav_static_map_no_mesh_collision", action="store_true", default=False, help="do not temporarily apply CollisionAPI to static meshes before occupancy map export")
 
 parser.add_argument("--physics_dt", type=float, default=None, help="physics time step, e.g., 0.005")
@@ -405,15 +410,20 @@ def main():
             if map_origin is None:
                 robot_pos = env.scene["robot"].data.root_pos_w[0].detach().cpu().tolist()
                 map_origin = (float(robot_pos[0]), float(robot_pos[1]), 0.1)
+            bound_prim_path, exclude_prim_paths = resolve_nav_static_map_scope(
+                args_cli.task,
+                args_cli.nav_static_map_bound_prim,
+                args_cli.nav_static_map_exclude_prims,
+            )
             map_info = export_g1_nav_static_map(
                 G1NavStaticMapExportConfig(
                     output_yaml=args_cli.export_nav_static_map,
                     cell_size=args_cli.nav_static_map_cell_size,
                     origin=tuple(map_origin),
                     z_bounds=tuple(args_cli.nav_static_map_z_bounds),
-                    bound_prim_path=args_cli.nav_static_map_bound_prim,
+                    bound_prim_path=bound_prim_path,
                     padding=args_cli.nav_static_map_padding,
-                    exclude_prim_paths=tuple(args_cli.nav_static_map_exclude_prims),
+                    exclude_prim_paths=exclude_prim_paths,
                     apply_collision_to_meshes=not args_cli.nav_static_map_no_mesh_collision,
                 )
             )
@@ -746,47 +756,13 @@ if __name__ == "__main__":
         
         # Get current process information
         import os
-        import subprocess
-        import signal
-        import time
+        from ros2_bridge.process_cleanup import cleanup_matching_descendants
         
         current_pid = os.getpid()
         print(f"Current main process PID: {current_pid}")
         
         try:
-            # Find all related Python processes
-            result = subprocess.run(['pgrep', '-f', 'sim_main.py'], 
-                                  capture_output=True, text=True)
-            if result.returncode == 0:
-                pids = result.stdout.strip().split('\n')
-                print(f"Found related processes: {pids}")
-                
-                for pid in pids:
-                    if pid and pid != str(current_pid):
-                        try:
-                            print(f"Terminating child process: {pid}")
-                            os.kill(int(pid), signal.SIGTERM)
-                        except ProcessLookupError:
-                            print(f"Process {pid} does not exist")
-                        except Exception as e:
-                            print(f"Failed to terminate process {pid}: {e}")
-                
-                # Wait for processes to exit
-                time.sleep(2)
-                
-                # Check if there are any remaining processes, force kill them
-                result2 = subprocess.run(['pgrep', '-f', 'sim_main.py'], 
-                                       capture_output=True, text=True)
-                if result2.returncode == 0:
-                    remaining_pids = result2.stdout.strip().split('\n')
-                    for pid in remaining_pids:
-                        if pid and pid != str(current_pid):
-                            try:
-                                print(f"Force killing process: {pid}")
-                                os.kill(int(pid), signal.SIGKILL)
-                            except Exception as e:
-                                print(f"Failed to force kill process {pid}: {e}")
-                                
+            cleanup_matching_descendants(command_substring="sim_main.py")
         except Exception as e:
             print(f"Error during process cleanup: {e}")
         

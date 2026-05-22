@@ -37,15 +37,41 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
             exporter.index("from isaacsim.asset.gen.omap.bindings import _omap"),
         )
 
+    def test_exporter_primes_physics_before_occupancy_generation(self):
+        exporter = (
+            ROOT / "ros2_bridge" / "g1_nav_static_map_exporter.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("omni.timeline", exporter)
+        self.assertIn("_prime_omap_physics_scene", exporter)
+        self.assertIn("_restore_timeline_state", exporter)
+        self.assertIn("timeline.play()", exporter)
+        self.assertIn("app.update()", exporter)
+        self.assertLess(
+            exporter.index("_prime_omap_physics_scene()"),
+            exporter.index("generator.generate2d()"),
+        )
+
     def test_exporter_can_apply_collision_to_visual_meshes_for_mapping(self):
         exporter = (
             ROOT / "ros2_bridge" / "g1_nav_static_map_exporter.py"
         ).read_text(encoding="utf-8")
 
         self.assertIn("apply_collision_to_meshes", exporter)
-        self.assertIn("_apply_collision_to_meshes", exporter)
+        self.assertIn("_apply_visual_mesh_colliders_for_mapping", exporter)
         self.assertIn("UsdPhysics.CollisionAPI.Apply", exporter)
         self.assertIn("UsdGeom.Mesh", exporter)
+
+    def test_exporter_uses_occupancy_ui_visual_mesh_layer_pattern(self):
+        exporter = (
+            ROOT / "ros2_bridge" / "g1_nav_static_map_exporter.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("Sdf.Layer.CreateAnonymous", exporter)
+        self.assertIn("Usd.EditContext", exporter)
+        self.assertIn("utils.removePhysics", exporter)
+        self.assertIn('utils.setCollider(prim, "none")', exporter)
+        self.assertIn("_remove_session_layer", exporter)
 
     def test_exporter_temporarily_excludes_robot_and_object(self):
         exporter = (
@@ -56,6 +82,38 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn("/World/envs/env_0/Object", exporter)
         self.assertIn("_set_prims_active", exporter)
         self.assertIn("_restore_prims_active", exporter)
+
+    def test_kitchen_static_map_defaults_to_kitchen_prim_without_robot_deactivation(self):
+        from ros2_bridge.g1_nav_static_map_exporter import (
+            DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
+            DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+            resolve_nav_static_map_scope,
+        )
+
+        bound_prim, exclude_prims = resolve_nav_static_map_scope(
+            "Isaac-Kitchen-G129-Dex1-Wholebody",
+            DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
+            DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+        )
+
+        self.assertEqual(bound_prim, "/World/envs/env_0/Kitchen")
+        self.assertEqual(exclude_prims, ())
+
+    def test_non_kitchen_static_map_keeps_existing_default_scope(self):
+        from ros2_bridge.g1_nav_static_map_exporter import (
+            DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
+            DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+            resolve_nav_static_map_scope,
+        )
+
+        bound_prim, exclude_prims = resolve_nav_static_map_scope(
+            "Isaac-Move-Cylinder-G129-Dex1-Wholebody-Nav",
+            DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
+            DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+        )
+
+        self.assertEqual(bound_prim, DEFAULT_NAV_STATIC_MAP_BOUND_PRIM)
+        self.assertEqual(exclude_prims, DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS)
 
     def test_pgm_writer_outputs_ros_compatible_binary_pgm(self):
         from ros2_bridge.g1_nav_static_map_exporter import _write_pgm
