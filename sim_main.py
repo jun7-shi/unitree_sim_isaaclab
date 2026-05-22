@@ -81,6 +81,13 @@ parser.add_argument("--nav_ros_camera_frame", type=str, default="g1_head_d435_de
 parser.add_argument("--nav_ros_node_namespace", type=str, default="", help="ROS2 node namespace for humanoid navigation camera publishers")
 parser.add_argument("--nav_ros_camera_width", type=int, default=640, help="render product width for the G1 head RGBD PointCloud2")
 parser.add_argument("--nav_ros_camera_height", type=int, default=480, help="render product height for the G1 head RGBD PointCloud2")
+parser.add_argument("--export_nav_static_map", type=str, default="", help="export a Nav2 static occupancy map YAML/PGM from the current Unitree IsaacLab env and exit")
+parser.add_argument("--nav_static_map_cell_size", type=float, default=0.05, help="cell size in meters for --export_nav_static_map")
+parser.add_argument("--nav_static_map_origin", type=float, nargs=3, default=(-3.9, -2.81811, 0.1), metavar=("X", "Y", "Z"), help="free start point for Isaac Sim occupancy map generation")
+parser.add_argument("--nav_static_map_z_bounds", type=float, nargs=2, default=(0.05, 1.2), metavar=("MIN_Z", "MAX_Z"), help="height slice for static occupancy map generation")
+parser.add_argument("--nav_static_map_bound_prim", type=str, default="/World/envs/env_0", help="USD prim whose world bounds define the XY occupancy map extent")
+parser.add_argument("--nav_static_map_padding", type=float, default=0.25, help="extra XY padding around --nav_static_map_bound_prim")
+parser.add_argument("--nav_static_map_exclude_prims", type=str, nargs="*", default=["/World/envs/env_0/Robot", "/World/envs/env_0/Object"], help="prim paths to temporarily deactivate while exporting the static map")
 
 parser.add_argument("--physics_dt", type=float, default=None, help="physics time step, e.g., 0.005")
 parser.add_argument("--render_interval", type=int, default=None, help="render interval steps (>=1)")
@@ -386,6 +393,31 @@ def main():
         )
     env.sim.reset()
     env.reset()
+    if args_cli.export_nav_static_map:
+        try:
+            from ros2_bridge.g1_nav_static_map_exporter import (
+                G1NavStaticMapExportConfig,
+                export_g1_nav_static_map,
+            )
+
+            map_info = export_g1_nav_static_map(
+                G1NavStaticMapExportConfig(
+                    output_yaml=args_cli.export_nav_static_map,
+                    cell_size=args_cli.nav_static_map_cell_size,
+                    origin=tuple(args_cli.nav_static_map_origin),
+                    z_bounds=tuple(args_cli.nav_static_map_z_bounds),
+                    bound_prim_path=args_cli.nav_static_map_bound_prim,
+                    padding=args_cli.nav_static_map_padding,
+                    exclude_prim_paths=tuple(args_cli.nav_static_map_exclude_prims),
+                )
+            )
+            print(f"[nav_map] Static map exported: {map_info}")
+        except Exception as e:
+            print(f"[nav_map] failed to export static map: {e}")
+            return
+        finally:
+            env.close()
+        return
     if args_cli.enable_nav_ros_clock:
         try:
             from ros2_bridge.g1_nav_clock_bridge import (
