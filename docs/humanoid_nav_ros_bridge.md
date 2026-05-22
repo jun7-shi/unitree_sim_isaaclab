@@ -3,29 +3,30 @@
 This document records the Unitree Isaac Sim ROS2 bridge path used by HUM-40 and
 HUM-41.
 
-## G1 Nav Bridge
+## G1 Kitchen Bridge
 
-Launch the G1 navigation task with the ROS2 clock, TF/odometry, and head RGBD
-PointCloud2 bridges enabled:
+Launch the G1 Kitchen task with the ROS2 clock and TF/odometry bridges enabled:
 
 ```bash
 cd /data/jun7.shi/code/poc/unitree/Manipulation/.worktrees/unitree-g1-nav-task
-export HUMANOID_NAVIGATION_G1_NAV_USD=/data/jun7.shi/code/poc/IsaacSim-ros_workspaces/.worktrees/nav2-humanoid-navigation/humble_ws/src/navigation/humanoid_navigation/assets/g1_nav/g1_29dof_with_dex1_nav_depth.usd
 conda run -n unitree_sim_lab python sim_main.py \
   --device cpu \
   --enable_cameras \
-  --task Isaac-Move-Cylinder-G129-Dex1-Wholebody-Nav \
+  --task Isaac-Kitchen-G129-Dex1-Wholebody \
   --robot_type g129 \
   --enable_dex1_dds \
   --enable_nav_ros_clock \
   --enable_nav_ros_tf_odom \
-  --enable_nav_ros_pointcloud \
   --headless
 ```
 
-Use `--headless` instead of `--no_render` for the PointCloud2 bridge. The
-camera `depth_pcl` publisher depends on Isaac Sim render product updates, and
-`--no_render` intentionally suppresses regular rendering.
+The V1.0 acceptance path is static-map navigation, so it does not require the
+PointCloud2 bridge. For V1.5 RGBD perception, add `--enable_nav_ros_pointcloud`
+when the active task exposes a depth-capable `front_camera`.
+
+Use `--headless` instead of `--no_render` when the PointCloud2 bridge is enabled.
+The camera `depth_pcl` publisher depends on Isaac Sim render product updates,
+and `--no_render` intentionally suppresses regular rendering.
 
 The bridge uses Isaac Sim's built-in `isaacsim.ros2.bridge` OmniGraph nodes and
 matches NVIDIA's scripted equivalents for the UI graph shortcuts:
