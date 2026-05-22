@@ -51,6 +51,12 @@ map -> odom -> base_link
 /g1/head_rgbd/points sensor_msgs/PointCloud2
 ```
 
+`/odom` is local odometry and starts near zero at bridge creation. The bridge
+sets `map -> odom` to the robot chassis world position so `map -> base_link`
+matches the Isaac Sim environment position. Override that initial map alignment
+with `--nav_ros_map_odom_translation X Y Z` when using a static map with a
+different origin.
+
 Default frame and topic contract:
 
 ```text
@@ -71,6 +77,7 @@ Run these from a ROS 2 Humble shell while Isaac Sim is running:
 
 ```bash
 ros2 run tf2_ros tf2_echo map base_link
+ros2 run tf2_ros tf2_echo odom base_link
 ros2 topic hz /clock
 ros2 topic hz /odom
 ros2 topic echo --once /odom.header.frame_id

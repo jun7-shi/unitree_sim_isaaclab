@@ -64,6 +64,14 @@ parser.add_argument("--nav_ros_odom_frame", type=str, default="odom", help="Nav2
 parser.add_argument("--nav_ros_base_frame", type=str, default="base_link", help="Nav2 base frame id")
 parser.add_argument("--nav_ros_odom_topic", type=str, default="/odom", help="ROS2 odometry topic for Nav2")
 parser.add_argument("--nav_ros_tf_topic", type=str, default="tf", help="ROS2 TF topic for Nav2")
+parser.add_argument(
+    "--nav_ros_map_odom_translation",
+    type=float,
+    nargs=3,
+    default=None,
+    metavar=("X", "Y", "Z"),
+    help="override the map->odom translation; defaults to the robot chassis world position at bridge creation",
+)
 parser.add_argument("--enable_nav_ros_pointcloud", action="store_true", default=False, help="enable ROS2 PointCloud2 bridge for the G1 head RGBD camera")
 parser.add_argument("--nav_ros_pointcloud_graph_path", type=str, default="/ActionGraph/HumanoidNavPointCloud", help="OmniGraph path for the navigation ROS2 PointCloud2 bridge")
 parser.add_argument("--nav_ros_camera_prim_path", type=str, default=None, help="explicit camera prim path for the navigation ROS2 PointCloud2 bridge")
@@ -412,6 +420,7 @@ def main():
                     base_frame=args_cli.nav_ros_base_frame,
                     odom_topic=args_cli.nav_ros_odom_topic,
                     tf_topic=args_cli.nav_ros_tf_topic,
+                    map_odom_translation=args_cli.nav_ros_map_odom_translation,
                 ),
             )
             print(f"[nav_ros] TF/odom bridge enabled: {bridge_info}")

@@ -1,5 +1,6 @@
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +26,33 @@ class G1NavRosBridgeStaticTests(unittest.TestCase):
             resolve_robot_prim_path(FakeEnv()),
             "/World/envs/env_0/Robot/pelvis",
         )
+
+    def test_auto_map_odom_translation_uses_initial_chassis_world_position(self):
+        from ros2_bridge.g1_nav_tf_odom_bridge import resolve_map_odom_translation
+
+        with patch(
+            "ros2_bridge.g1_nav_tf_odom_bridge._find_stage_world_translation",
+            return_value=[-3.9, -2.81811, 0.8],
+        ):
+            self.assertEqual(
+                resolve_map_odom_translation("/World/envs/env_0/Robot/pelvis"),
+                [-3.9, -2.81811, 0.8],
+            )
+
+    def test_configured_map_odom_translation_overrides_auto_stage_lookup(self):
+        from ros2_bridge.g1_nav_tf_odom_bridge import resolve_map_odom_translation
+
+        with patch(
+            "ros2_bridge.g1_nav_tf_odom_bridge._find_stage_world_translation",
+            return_value=[-3.9, -2.81811, 0.8],
+        ):
+            self.assertEqual(
+                resolve_map_odom_translation(
+                    "/World/envs/env_0/Robot/pelvis",
+                    configured_translation=(1, 2, 3),
+                ),
+                [1.0, 2.0, 3.0],
+            )
 
     def test_bridge_helper_builds_tf_odom_graph(self):
         bridge = (ROOT / "ros2_bridge/g1_nav_tf_odom_bridge.py").read_text(
@@ -65,6 +93,7 @@ class G1NavRosBridgeStaticTests(unittest.TestCase):
         self.assertIn("G1NavTfOdomBridgeConfig", sim_main)
         self.assertIn("nav_ros_map_frame", sim_main)
         self.assertIn("nav_ros_odom_topic", sim_main)
+        self.assertIn("nav_ros_map_odom_translation", sim_main)
 
     def test_bridge_doc_contains_launch_and_verification_commands(self):
         doc = (ROOT / "docs/humanoid_nav_ros_bridge.md").read_text(
@@ -78,6 +107,7 @@ class G1NavRosBridgeStaticTests(unittest.TestCase):
         self.assertIn("ros2 run tf2_ros tf2_echo map base_link", doc)
         self.assertIn("ros2 topic hz /odom", doc)
         self.assertIn("map -> odom -> base_link", doc)
+        self.assertIn("--nav_ros_map_odom_translation X Y Z", doc)
 
 
 if __name__ == "__main__":

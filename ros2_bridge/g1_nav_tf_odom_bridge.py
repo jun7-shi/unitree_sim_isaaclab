@@ -3,6 +3,7 @@
 """Isaac Sim ROS2 TF and odometry graph for G1 navigation."""
 
 from dataclasses import dataclass
+from typing import Sequence
 
 
 @dataclass(frozen=True)
@@ -15,9 +16,11 @@ class G1NavTfOdomBridgeConfig:
     base_frame: str = "base_link"
     odom_topic: str = "/odom"
     tf_topic: str = "tf"
+    map_odom_translation: tuple[float, float, float] | None = None
 
 
 _PREFERRED_CHASSIS_LINKS = ("pelvis", "base_link", "base", "torso_link")
+_ZERO_TRANSLATION = [0.0, 0.0, 0.0]
 
 
 def _enable_ros2_bridge_extension() -> None:
@@ -72,6 +75,41 @@ def _find_stage_chassis_prim_path(robot_prim_path: str) -> str | None:
         return None
 
     return None
+
+
+def _find_stage_world_translation(prim_path: str) -> list[float] | None:
+    try:
+        import omni.usd
+
+        stage = omni.usd.get_context().get_stage()
+        if stage is None:
+            return None
+
+        prim = stage.GetPrimAtPath(prim_path)
+        if not prim or not prim.IsValid():
+            return None
+
+        world_transform = omni.usd.get_world_transform_matrix(prim)
+        translation = world_transform.ExtractTranslation()
+        return [float(translation[0]), float(translation[1]), float(translation[2])]
+    except Exception:
+        return None
+
+
+def _coerce_translation(translation: Sequence[float]) -> list[float]:
+    if len(translation) != 3:
+        raise ValueError("map_odom_translation must contain exactly three values")
+    return [float(translation[0]), float(translation[1]), float(translation[2])]
+
+
+def resolve_map_odom_translation(
+    robot_prim_path: str,
+    configured_translation: Sequence[float] | None = None,
+) -> list[float]:
+    if configured_translation is not None:
+        return _coerce_translation(configured_translation)
+
+    return _find_stage_world_translation(robot_prim_path) or list(_ZERO_TRANSLATION)
 
 
 def _resolve_chassis_prim_path(robot_prim_path: str) -> str:
@@ -133,10 +171,15 @@ def create_g1_nav_tf_odom_graph(
     robot_prim_path = config.robot_prim_path or resolve_robot_prim_path(
         env, config.robot_name
     )
+    map_odom_translation = resolve_map_odom_translation(
+        robot_prim_path,
+        config.map_odom_translation,
+    )
     if _graph_exists(og, config.graph_path):
         return {
             "graph_path": config.graph_path,
             "robot_prim_path": robot_prim_path,
+            "map_odom_translation": str(map_odom_translation),
             "odom_topic": config.odom_topic,
             "tf_topic": config.tf_topic,
         }
@@ -167,7 +210,7 @@ def create_g1_nav_tf_odom_graph(
                 ("TFMapOdom.inputs:topicName", config.tf_topic),
                 ("TFMapOdom.inputs:parentFrameId", config.map_frame),
                 ("TFMapOdom.inputs:childFrameId", config.odom_frame),
-                ("TFMapOdom.inputs:translation", [0.0, 0.0, 0.0]),
+                ("TFMapOdom.inputs:translation", map_odom_translation),
                 ("TFMapOdom.inputs:rotation", [0.0, 0.0, 0.0, 1.0]),
                 ("TFOdomBase.inputs:topicName", config.tf_topic),
                 ("TFOdomBase.inputs:parentFrameId", config.odom_frame),
@@ -206,6 +249,7 @@ def create_g1_nav_tf_odom_graph(
     return {
         "graph_path": config.graph_path,
         "robot_prim_path": robot_prim_path,
+        "map_odom_translation": str(map_odom_translation),
         "odom_topic": config.odom_topic,
         "tf_topic": config.tf_topic,
     }
