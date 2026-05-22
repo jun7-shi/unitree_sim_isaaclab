@@ -20,6 +20,14 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn('env.scene["robot"].data.root_pos_w', sim_main)
         self.assertIn("export_g1_nav_static_map", sim_main)
 
+    def test_sim_main_exposes_nav_udp_command_bridge_cli(self):
+        sim_main = (ROOT / "sim_main.py").read_text(encoding="utf-8")
+
+        self.assertIn("--enable_nav_udp_cmd_bridge", sim_main)
+        self.assertIn("--nav_udp_cmd_host", sim_main)
+        self.assertIn("--nav_udp_cmd_port", sim_main)
+        self.assertIn("G1NavUdpCmdBridge", sim_main)
+
     def test_exporter_uses_official_isaac_sim_omap_api(self):
         exporter = (
             ROOT / "ros2_bridge" / "g1_nav_static_map_exporter.py"

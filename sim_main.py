@@ -27,6 +27,10 @@ from ros2_bridge.g1_nav_static_map_exporter import (
     DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
     resolve_nav_static_map_scope,
 )
+from ros2_bridge.g1_nav_cmd_udp_bridge import (
+    G1NavUdpCmdBridge,
+    G1NavUdpCmdBridgeConfig,
+)
 # add command line arguments
 parser = argparse.ArgumentParser(description="Unitree Simulation")
 parser.add_argument("--task", type=str, default="Isaac-PickPlace-G129-Head-Waist-Fix", help="task name")
@@ -86,6 +90,10 @@ parser.add_argument("--nav_ros_camera_frame", type=str, default="g1_head_d435_de
 parser.add_argument("--nav_ros_node_namespace", type=str, default="", help="ROS2 node namespace for humanoid navigation camera publishers")
 parser.add_argument("--nav_ros_camera_width", type=int, default=640, help="render product width for the G1 head RGBD PointCloud2")
 parser.add_argument("--nav_ros_camera_height", type=int, default=480, help="render product height for the G1 head RGBD PointCloud2")
+parser.add_argument("--enable_nav_udp_cmd_bridge", action="store_true", default=False, help="receive Nav2 velocity commands over UDP and write Unitree run commands")
+parser.add_argument("--nav_udp_cmd_host", type=str, default="127.0.0.1", help="UDP host/interface for the Nav2 command bridge")
+parser.add_argument("--nav_udp_cmd_port", type=int, default=18080, help="UDP port for the Nav2 command bridge")
+parser.add_argument("--nav_udp_cmd_stale_timeout", type=float, default=0.5, help="seconds before the Nav2 UDP command bridge writes a zero command")
 parser.add_argument("--export_nav_static_map", type=str, default="", help="export a Nav2 static occupancy map YAML/PGM from the current Unitree IsaacLab env and exit")
 parser.add_argument("--nav_static_map_cell_size", type=float, default=0.05, help="cell size in meters for --export_nav_static_map")
 parser.add_argument("--nav_static_map_origin", type=float, nargs=3, default=None, metavar=("X", "Y", "Z"), help="free start point for Isaac Sim occupancy map generation; defaults to the robot start x/y with z=0.1")
@@ -156,7 +164,7 @@ from action_provider.create_action_provider import create_action_provider
 from tools.get_stiffness import get_robot_stiffness_from_env
 from tools.get_reward import get_step_reward_value,get_current_rewards
 
-def setup_signal_handlers(controller,dds_manager=None,image_server=None):
+def setup_signal_handlers(controller,dds_manager=None,image_server=None,nav_udp_cmd_bridge=None):
     """set signal handlers"""
     def signal_handler(signum, frame):
         print(f"\nreceived signal {signum}, stopping controller...")
@@ -174,6 +182,11 @@ def setup_signal_handlers(controller,dds_manager=None,image_server=None):
                 image_server.stop()
         except Exception as e:
             print(f"Failed to stop image server: {e}")
+        try:
+            if nav_udp_cmd_bridge is not None:
+                nav_udp_cmd_bridge.stop()
+        except Exception as e:
+            print(f"Failed to stop nav UDP command bridge: {e}")
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
@@ -525,7 +538,7 @@ def main():
         print(f"Failed to create control configuration: {e}")
         return
     
-    # create controller
+    nav_udp_cmd_bridge = None
 
     if not args_cli.replay_data:
         print("========= create image server =========")
@@ -542,6 +555,28 @@ def main():
             print(f"Failed to create dds: {e}")
             return
         print("========= create dds success =========")
+        if args_cli.enable_nav_udp_cmd_bridge:
+            try:
+                run_command_dds = dds_manager.get_object("run_command")
+                if run_command_dds is None:
+                    print("[nav_udp_cmd] run_command DDS object is not available. Use a Wholebody task or --enable_wholebody_dds.")
+                    return
+                nav_udp_cmd_bridge = G1NavUdpCmdBridge(
+                    run_command_dds,
+                    G1NavUdpCmdBridgeConfig(
+                        host=args_cli.nav_udp_cmd_host,
+                        port=args_cli.nav_udp_cmd_port,
+                        stale_timeout_sec=args_cli.nav_udp_cmd_stale_timeout,
+                    ),
+                )
+                nav_udp_cmd_bridge.start()
+                print(
+                    f"[nav_udp_cmd] bridge enabled on "
+                    f"{args_cli.nav_udp_cmd_host}:{nav_udp_cmd_bridge.port}"
+                )
+            except Exception as e:
+                print(f"[nav_udp_cmd] failed to start bridge: {e}")
+                return
     else:
         print("========= create dds =========")
         try:
@@ -591,7 +626,7 @@ def main():
 
     # set signal handlers
     if not args_cli.replay_data:
-        setup_signal_handlers(controller,dds_manager,image_server)
+        setup_signal_handlers(controller,dds_manager,image_server,nav_udp_cmd_bridge)
     else:
         setup_signal_handlers(controller)
         
@@ -737,6 +772,8 @@ def main():
     finally:
         # clean up resources
         print("\nclean up resources...")
+        if nav_udp_cmd_bridge is not None:
+            nav_udp_cmd_bridge.stop()
         controller.cleanup()
         image_server.stop()
         env.close()
