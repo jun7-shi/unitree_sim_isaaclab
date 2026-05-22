@@ -16,6 +16,8 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn("--nav_static_map_z_bounds", sim_main)
         self.assertIn("--nav_static_map_bound_prim", sim_main)
         self.assertIn("--nav_static_map_exclude_prims", sim_main)
+        self.assertIn("--nav_static_map_no_mesh_collision", sim_main)
+        self.assertIn('env.scene["robot"].data.root_pos_w', sim_main)
         self.assertIn("export_g1_nav_static_map", sim_main)
 
     def test_exporter_uses_official_isaac_sim_omap_api(self):
@@ -29,10 +31,21 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn("generator.set_transform", exporter)
         self.assertIn("generator.generate2d", exporter)
         self.assertIn("generator.get_buffer", exporter)
+        self.assertIn("_buffer_histogram", exporter)
         self.assertLess(
             exporter.index("_enable_omap_extension()"),
             exporter.index("from isaacsim.asset.gen.omap.bindings import _omap"),
         )
+
+    def test_exporter_can_apply_collision_to_visual_meshes_for_mapping(self):
+        exporter = (
+            ROOT / "ros2_bridge" / "g1_nav_static_map_exporter.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("apply_collision_to_meshes", exporter)
+        self.assertIn("_apply_collision_to_meshes", exporter)
+        self.assertIn("UsdPhysics.CollisionAPI.Apply", exporter)
+        self.assertIn("UsdGeom.Mesh", exporter)
 
     def test_exporter_temporarily_excludes_robot_and_object(self):
         exporter = (
@@ -51,12 +64,12 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
             pgm_path = Path(temp_dir) / "map.pgm"
             _write_pgm(
                 pgm_path,
-                [0, 254, 205, 123],
+                [100, 0, 50, 123],
                 width=2,
                 height=2,
-                occupied_value=0,
-                free_value=254,
-                unknown_value=205,
+                occupied_value=100,
+                free_value=0,
+                unknown_value=50,
             )
 
             data = pgm_path.read_bytes()

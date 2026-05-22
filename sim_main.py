@@ -83,11 +83,12 @@ parser.add_argument("--nav_ros_camera_width", type=int, default=640, help="rende
 parser.add_argument("--nav_ros_camera_height", type=int, default=480, help="render product height for the G1 head RGBD PointCloud2")
 parser.add_argument("--export_nav_static_map", type=str, default="", help="export a Nav2 static occupancy map YAML/PGM from the current Unitree IsaacLab env and exit")
 parser.add_argument("--nav_static_map_cell_size", type=float, default=0.05, help="cell size in meters for --export_nav_static_map")
-parser.add_argument("--nav_static_map_origin", type=float, nargs=3, default=(-3.9, -2.81811, 0.1), metavar=("X", "Y", "Z"), help="free start point for Isaac Sim occupancy map generation")
+parser.add_argument("--nav_static_map_origin", type=float, nargs=3, default=None, metavar=("X", "Y", "Z"), help="free start point for Isaac Sim occupancy map generation; defaults to the robot start x/y with z=0.1")
 parser.add_argument("--nav_static_map_z_bounds", type=float, nargs=2, default=(0.05, 1.2), metavar=("MIN_Z", "MAX_Z"), help="height slice for static occupancy map generation")
 parser.add_argument("--nav_static_map_bound_prim", type=str, default="/World/envs/env_0", help="USD prim whose world bounds define the XY occupancy map extent")
 parser.add_argument("--nav_static_map_padding", type=float, default=0.25, help="extra XY padding around --nav_static_map_bound_prim")
 parser.add_argument("--nav_static_map_exclude_prims", type=str, nargs="*", default=["/World/envs/env_0/Robot", "/World/envs/env_0/Object"], help="prim paths to temporarily deactivate while exporting the static map")
+parser.add_argument("--nav_static_map_no_mesh_collision", action="store_true", default=False, help="do not temporarily apply CollisionAPI to static meshes before occupancy map export")
 
 parser.add_argument("--physics_dt", type=float, default=None, help="physics time step, e.g., 0.005")
 parser.add_argument("--render_interval", type=int, default=None, help="render interval steps (>=1)")
@@ -400,15 +401,20 @@ def main():
                 export_g1_nav_static_map,
             )
 
+            map_origin = args_cli.nav_static_map_origin
+            if map_origin is None:
+                robot_pos = env.scene["robot"].data.root_pos_w[0].detach().cpu().tolist()
+                map_origin = (float(robot_pos[0]), float(robot_pos[1]), 0.1)
             map_info = export_g1_nav_static_map(
                 G1NavStaticMapExportConfig(
                     output_yaml=args_cli.export_nav_static_map,
                     cell_size=args_cli.nav_static_map_cell_size,
-                    origin=tuple(args_cli.nav_static_map_origin),
+                    origin=tuple(map_origin),
                     z_bounds=tuple(args_cli.nav_static_map_z_bounds),
                     bound_prim_path=args_cli.nav_static_map_bound_prim,
                     padding=args_cli.nav_static_map_padding,
                     exclude_prim_paths=tuple(args_cli.nav_static_map_exclude_prims),
+                    apply_collision_to_meshes=not args_cli.nav_static_map_no_mesh_collision,
                 )
             )
             print(f"[nav_map] Static map exported: {map_info}")

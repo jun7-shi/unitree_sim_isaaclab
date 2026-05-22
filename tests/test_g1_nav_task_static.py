@@ -66,6 +66,22 @@ class G1NavTaskStaticTests(unittest.TestCase):
         self.assertIn("MoveCylinderG129Dex1WholebodyNavEnvCfg", nav_init)
         self.assertIn("g1_29dof_dex1_wholebody_nav", nav_cfg)
 
+    def test_kitchen_wholebody_task_is_available_for_navigation_acceptance(self):
+        kitchen_init = (
+            ROOT / "tasks/g1_tasks/kitchen_g1_29dof_dex1_wholebody/__init__.py"
+        ).read_text(encoding="utf-8")
+        kitchen_cfg = (
+            ROOT
+            / "tasks/g1_tasks/kitchen_g1_29dof_dex1_wholebody/"
+            "kitchen_g1_29dof_dex1_hw_env_cfg.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("Isaac-Kitchen-G129-Dex1-Wholebody", kitchen_init)
+        self.assertIn("KitchenG129Dex1WholebodyEnvCfg", kitchen_init)
+        self.assertIn("KITCHEN_USD_PATH", kitchen_cfg)
+        self.assertIn("/World/envs/env_.*/Kitchen", kitchen_cfg)
+        self.assertIn("g1_29dof_dex1_wholebody", kitchen_cfg)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,7 +4,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -14,8 +15,8 @@ class G1NavStaticMapExportConfig:
     """Configuration for generating a ROS occupancy map from Isaac Sim."""
 
     output_yaml: str
+    origin: tuple[float, float, float]
     cell_size: float = 0.05
-    origin: tuple[float, float, float] = (-3.9, -2.81811, 0.1)
     z_bounds: tuple[float, float] = (0.05, 1.2)
     bound_prim_path: str = "/World/envs/env_0"
     padding: float = 0.25
@@ -23,9 +24,10 @@ class G1NavStaticMapExportConfig:
         "/World/envs/env_0/Robot",
         "/World/envs/env_0/Object",
     )
-    occupied_value: int = 0
-    free_value: int = 254
-    unknown_value: int = 205
+    apply_collision_to_meshes: bool = True
+    occupied_value: int = 100
+    free_value: int = 0
+    unknown_value: int = 50
     occupied_thresh: float = 0.65
     free_thresh: float = 0.196
 
@@ -41,9 +43,14 @@ def export_g1_nav_static_map(config: G1NavStaticMapExportConfig) -> dict:
 
     stage = omni.usd.get_context().get_stage()
     excluded_prims = _set_prims_active(stage, config.exclude_prim_paths, active=False)
+    applied_collision_count = 0
 
     try:
         min_bound, max_bound = _compute_xy_bounds(stage, config)
+        if config.apply_collision_to_meshes:
+            applied_collision_count = _apply_collision_to_meshes(
+                stage, config.bound_prim_path
+            )
         physx = omni.physx.get_physx_interface()
         stage_id = omni.usd.get_context().get_stage_id()
         generator = _omap.Generator(physx, stage_id)
@@ -58,6 +65,7 @@ def export_g1_nav_static_map(config: G1NavStaticMapExportConfig) -> dict:
 
         width, height, _depth = tuple(generator.get_dimensions())
         buffer = generator.get_buffer()
+        buffer_histogram = _buffer_histogram(buffer)
         output_yaml, output_image = _resolve_output_paths(config.output_yaml)
         _write_pgm(
             output_image,
@@ -77,6 +85,8 @@ def export_g1_nav_static_map(config: G1NavStaticMapExportConfig) -> dict:
             "resolution": config.cell_size,
             "origin": [float(min_bound[0]), float(min_bound[1]), 0.0],
             "excluded_prims": sorted(excluded_prims),
+            "applied_collision_to_mesh_count": applied_collision_count,
+            "buffer_histogram": buffer_histogram,
         }
     finally:
         _restore_prims_active(stage, excluded_prims)
@@ -106,6 +116,21 @@ def _restore_prims_active(stage, prim_active_states: dict[str, bool]) -> None:
             prim.SetActive(was_active)
 
 
+def _apply_collision_to_meshes(stage, bound_prim_path: str) -> int:
+    from pxr import Usd, UsdGeom, UsdPhysics
+
+    root = stage.GetPrimAtPath(bound_prim_path)
+    if not root or not root.IsValid():
+        return 0
+
+    applied_count = 0
+    for prim in Usd.PrimRange(root):
+        if prim.IsA(UsdGeom.Mesh) and not prim.HasAPI(UsdPhysics.CollisionAPI):
+            UsdPhysics.CollisionAPI.Apply(prim)
+            applied_count += 1
+    return applied_count
+
+
 def _compute_xy_bounds(stage, config: G1NavStaticMapExportConfig):
     from pxr import Usd, UsdGeom
 
@@ -129,6 +154,10 @@ def _compute_xy_bounds(stage, config: G1NavStaticMapExportConfig):
         float(max_z),
     )
     return min_bound, max_bound
+
+
+def _buffer_histogram(buffer) -> dict[int, int]:
+    return dict(sorted(Counter(int(value) for value in buffer).items()))
 
 
 def _resolve_output_paths(output_yaml: str) -> tuple[Path, Path]:
