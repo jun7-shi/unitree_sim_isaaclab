@@ -6,6 +6,26 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class G1NavRosBridgeStaticTests(unittest.TestCase):
+    def test_resolves_g1_pelvis_as_default_chassis_prim(self):
+        from ros2_bridge.g1_nav_tf_odom_bridge import resolve_robot_prim_path
+
+        class FakeRobot:
+            prim_path = "/World/envs/env_0/Robot"
+
+        class FakeScene:
+            def __getitem__(self, name):
+                if name != "robot":
+                    raise KeyError(name)
+                return FakeRobot()
+
+        class FakeEnv:
+            scene = FakeScene()
+
+        self.assertEqual(
+            resolve_robot_prim_path(FakeEnv()),
+            "/World/envs/env_0/Robot/pelvis",
+        )
+
     def test_bridge_helper_builds_tf_odom_graph(self):
         bridge = (ROOT / "ros2_bridge/g1_nav_tf_odom_bridge.py").read_text(
             encoding="utf-8"

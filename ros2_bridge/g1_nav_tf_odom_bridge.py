@@ -17,6 +17,9 @@ class G1NavTfOdomBridgeConfig:
     tf_topic: str = "tf"
 
 
+_PREFERRED_CHASSIS_LINKS = ("pelvis", "base_link", "base", "torso_link")
+
+
 def _enable_ros2_bridge_extension() -> None:
     import omni.kit.app
 
@@ -26,7 +29,74 @@ def _enable_ros2_bridge_extension() -> None:
         manager.set_extension_enabled_immediate(extension_id, True)
 
 
+def _candidate_chassis_prim_paths(robot_prim_path: str) -> list[str]:
+    robot_prim_path = robot_prim_path.rstrip("/")
+    leaf_name = robot_prim_path.rsplit("/", 1)[-1]
+    if leaf_name in _PREFERRED_CHASSIS_LINKS:
+        return [robot_prim_path]
+
+    return [
+        *(f"{robot_prim_path}/{link_name}" for link_name in _PREFERRED_CHASSIS_LINKS),
+        robot_prim_path,
+    ]
+
+
+def _find_stage_chassis_prim_path(robot_prim_path: str) -> str | None:
+    try:
+        import omni.usd
+        from pxr import Usd, UsdPhysics
+
+        stage = omni.usd.get_context().get_stage()
+        if stage is None:
+            return None
+
+        for prim_path in _candidate_chassis_prim_paths(robot_prim_path):
+            prim = stage.GetPrimAtPath(prim_path)
+            if prim and prim.IsValid() and (
+                prim.HasAPI(UsdPhysics.ArticulationRootAPI)
+                or prim.HasAPI(UsdPhysics.RigidBodyAPI)
+            ):
+                return prim_path
+
+        root_prim = stage.GetPrimAtPath(robot_prim_path)
+        if not root_prim or not root_prim.IsValid():
+            return None
+
+        for prim in Usd.PrimRange(root_prim):
+            if prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+                return str(prim.GetPath())
+        for prim in Usd.PrimRange(root_prim):
+            if prim.HasAPI(UsdPhysics.RigidBodyAPI):
+                return str(prim.GetPath())
+    except Exception:
+        return None
+
+    return None
+
+
+def _resolve_chassis_prim_path(robot_prim_path: str) -> str:
+    return (
+        _find_stage_chassis_prim_path(robot_prim_path)
+        or _candidate_chassis_prim_paths(robot_prim_path)[0]
+    )
+
+
 def resolve_robot_prim_path(env, robot_name: str = "robot") -> str:
+    robot = env.scene[robot_name]
+
+    prim_path = getattr(robot, "prim_path", None)
+    if prim_path and "*" not in prim_path:
+        return _resolve_chassis_prim_path(prim_path)
+
+    cfg = getattr(robot, "cfg", None)
+    cfg_prim_path = getattr(cfg, "prim_path", None)
+    if cfg_prim_path:
+        return _resolve_chassis_prim_path(cfg_prim_path.replace("env_.*", "env_0"))
+
+    return _resolve_chassis_prim_path("/World/envs/env_0/Robot")
+
+
+def resolve_robot_root_prim_path(env, robot_name: str = "robot") -> str:
     robot = env.scene[robot_name]
 
     prim_path = getattr(robot, "prim_path", None)
