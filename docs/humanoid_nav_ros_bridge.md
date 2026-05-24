@@ -18,8 +18,7 @@ conda run -n unitree_sim_lab python sim_main.py \
   --enable_nav_ros_tf_odom \
   --enable_nav_udp_cmd_bridge \
   --nav_minimal_dds \
-  --disable_image_server \
-  --no_render
+  --disable_image_server
 ```
 
 The V1.0 acceptance path is static-map navigation, so it does not require the
@@ -28,18 +27,17 @@ when the active task exposes a depth-capable `front_camera`.
 `--disable_image_server` skips the unrelated teleimager ZMQ/WebRTC image server.
 `--nav_minimal_dds` starts only the robot state, run command, reset pose, and
 sim-state DDS objects needed for Nav2 command driving; it avoids hand/reward DDS
-publishers that are not part of the navigation loop. It also skips the task
-shared-memory camera observation path inside the walking action provider, so
-Nav2 camera data should be published through Isaac Sim's ROS2 bridge instead.
-When PointCloud2 is not enabled, the walking action provider also avoids a
-per-step IsaacLab render call; `sim_main.py` still pumps the Isaac Sim app loop
-so the ROS bridge OmniGraphs publish `/clock` and TF/odom. The Nav2 bridge still
-publishes optional ROS camera data through Isaac Sim's ROS2 bridge.
+publishers that are not part of the navigation loop. In GUI mode it keeps the
+original Unitree walking loop's render and observation-manager updates so idle
+standing behavior matches the upstream simulator.
 
-Use `--no_render` for the V1.0 static-map TF/odom path. Use `--headless`
-instead of `--no_render` when the PointCloud2 bridge is enabled. The camera
-`depth_pcl` publisher depends on Isaac Sim render product updates, and
-`--no_render` intentionally suppresses regular rendering.
+Add `--no_render` for the V1.0 static-map TF/odom path when running without a
+GUI. In that mode the walking action provider skips regular render and
+observation-manager updates, and `sim_main.py` explicitly pumps the Isaac Sim
+app loop so the ROS bridge OmniGraphs publish `/clock` and TF/odom. Use
+`--headless` instead of `--no_render` when the PointCloud2 bridge is enabled.
+The camera `depth_pcl` publisher depends on Isaac Sim render product updates,
+and `--no_render` intentionally suppresses regular rendering.
 
 The bridge uses Isaac Sim's built-in `isaacsim.ros2.bridge` OmniGraph nodes and
 matches NVIDIA's scripted equivalents for the UI graph shortcuts:

@@ -31,6 +31,7 @@ from ros2_bridge.g1_nav_cmd_udp_bridge import (
     G1NavUdpCmdBridge,
     G1NavUdpCmdBridgeConfig,
 )
+from ros2_bridge.g1_nav_runtime_modes import should_update_nav_ros_app
 # add command line arguments
 parser = argparse.ArgumentParser(description="Unitree Simulation")
 parser.add_argument("--task", type=str, default="Isaac-PickPlace-G129-Head-Waist-Fix", help="task name")
@@ -656,10 +657,9 @@ def main():
         
         
         reward_interval = max(1, args_cli.reward_interval)
-        nav_ros_app_update_required = (
-            args_cli.nav_minimal_dds
-            and nav_ros_bridge_enabled
-            and not args_cli.enable_nav_ros_pointcloud
+        nav_ros_app_update_required = should_update_nav_ros_app(
+            args_cli,
+            nav_ros_bridge_enabled,
         )
 
         # use torch.inference_mode() and exception suppression

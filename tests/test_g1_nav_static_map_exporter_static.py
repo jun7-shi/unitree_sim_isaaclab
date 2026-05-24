@@ -44,6 +44,9 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         action_provider = (
             ROOT / "action_provider" / "action_provider_wh_dds.py"
         ).read_text(encoding="utf-8")
+        runtime_modes = (
+            ROOT / "ros2_bridge" / "g1_nav_runtime_modes.py"
+        ).read_text(encoding="utf-8")
         doc = (ROOT / "docs" / "humanoid_nav_ros_bridge.md").read_text(
             encoding="utf-8"
         )
@@ -64,13 +67,10 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         )
         self.assertIn("self.nav_minimal_dds", action_provider)
         self.assertIn("self.nav_render_required", action_provider)
-        self.assertIn("enable_nav_ros_pointcloud", action_provider)
-        self.assertIn("not self.nav_minimal_dds", action_provider)
+        self.assertIn("self.nav_observation_required", action_provider)
+        self.assertIn("enable_nav_ros_pointcloud", runtime_modes)
+        self.assertIn("no_render", runtime_modes)
         self.assertIn("self.nav_render_required", action_provider)
-        self.assertLess(
-            action_provider.index("not self.nav_minimal_dds"),
-            action_provider.index("self.env.observation_manager.compute()"),
-        )
         self.assertLess(
             action_provider.index("self.nav_render_required"),
             action_provider.index("self.env.sim.render()"),

@@ -12,6 +12,10 @@ import threading
 from isaaclab.utils.buffers import CircularBuffer,DelayBuffer
 import os
 import ast
+from ros2_bridge.g1_nav_runtime_modes import (
+    should_compute_action_observations,
+    should_render_action_provider,
+)
 project_root = os.environ.get("PROJECT_ROOT")
 class DDSRLActionProvider(ActionProvider):
     """Action provider based on DDS"""
@@ -24,10 +28,8 @@ class DDSRLActionProvider(ActionProvider):
         self.enable_inspire = args_cli.enable_inspire_dds
         self.wh = args_cli.enable_wholebody_dds
         self.nav_minimal_dds = bool(getattr(args_cli, "nav_minimal_dds", False))
-        self.nav_render_required = (
-            not self.nav_minimal_dds
-            or bool(getattr(args_cli, "enable_nav_ros_pointcloud", False))
-        )
+        self.nav_render_required = should_render_action_provider(args_cli)
+        self.nav_observation_required = should_compute_action_observations(args_cli)
         self.policy_path = f"{project_root}/"+args_cli.model_path
         self.env = env
         # Initialize DDS communication
@@ -448,7 +450,7 @@ class DDSRLActionProvider(ActionProvider):
 
             if self.nav_render_required:
                 self.env.sim.render()
-            if not self.nav_minimal_dds:
+            if self.nav_observation_required:
                 self.env.observation_manager.compute()
             
         except Exception as e:
