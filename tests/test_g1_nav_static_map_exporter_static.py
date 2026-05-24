@@ -18,6 +18,8 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn("--nav_static_map_exclude_prims", sim_main)
         self.assertIn("--nav_static_map_no_mesh_collision", sim_main)
         self.assertIn('env.scene["robot"].data.root_pos_w', sim_main)
+        self.assertIn("resolve_nav_static_map_collision_exclude_prims", sim_main)
+        self.assertIn("collision_exclude_prim_paths", sim_main)
         self.assertIn("export_g1_nav_static_map", sim_main)
 
     def test_sim_main_exposes_nav_udp_command_bridge_cli(self):
@@ -141,7 +143,7 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn("_set_prims_active", exporter)
         self.assertIn("_restore_prims_active", exporter)
 
-    def test_kitchen_static_map_bounds_to_kitchen_and_excludes_movable_prims(self):
+    def test_kitchen_static_map_bounds_to_kitchen_without_robot_deactivation(self):
         from ros2_bridge.g1_nav_static_map_exporter import (
             DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
             DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
@@ -155,7 +157,22 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         )
 
         self.assertEqual(bound_prim, "/World/envs/env_0/Kitchen")
-        self.assertEqual(exclude_prims, DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS)
+        self.assertEqual(exclude_prims, ("/World/envs/env_0/Object",))
+
+    def test_kitchen_static_map_disables_robot_collision_for_occupancy(self):
+        from ros2_bridge.g1_nav_static_map_exporter import (
+            DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
+            DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+            resolve_nav_static_map_collision_exclude_prims,
+        )
+
+        collision_exclude_prims = resolve_nav_static_map_collision_exclude_prims(
+            "Isaac-Kitchen-G129-Dex1-Wholebody",
+            DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
+            DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+        )
+
+        self.assertEqual(collision_exclude_prims, ("/World/envs/env_0/Robot",))
 
     def test_non_kitchen_static_map_keeps_existing_default_scope(self):
         from ros2_bridge.g1_nav_static_map_exporter import (

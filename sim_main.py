@@ -25,6 +25,7 @@ from dds.dds_create import create_dds_objects,create_dds_objects_replay
 from ros2_bridge.g1_nav_static_map_exporter import (
     DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
     DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+    resolve_nav_static_map_collision_exclude_prims,
     resolve_nav_static_map_scope,
 )
 from ros2_bridge.g1_nav_cmd_udp_bridge import (
@@ -434,6 +435,11 @@ def main():
                 args_cli.nav_static_map_bound_prim,
                 args_cli.nav_static_map_exclude_prims,
             )
+            collision_exclude_prim_paths = resolve_nav_static_map_collision_exclude_prims(
+                args_cli.task,
+                args_cli.nav_static_map_bound_prim,
+                args_cli.nav_static_map_exclude_prims,
+            )
             map_info = export_g1_nav_static_map(
                 G1NavStaticMapExportConfig(
                     output_yaml=args_cli.export_nav_static_map,
@@ -443,6 +449,7 @@ def main():
                     bound_prim_path=bound_prim_path,
                     padding=args_cli.nav_static_map_padding,
                     exclude_prim_paths=exclude_prim_paths,
+                    collision_exclude_prim_paths=collision_exclude_prim_paths,
                     apply_collision_to_meshes=not args_cli.nav_static_map_no_mesh_collision,
                 )
             )

@@ -16,6 +16,7 @@ DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS = (
     "/World/envs/env_0/Object",
 )
 KITCHEN_NAV_STATIC_MAP_BOUND_PRIM = "/World/envs/env_0/Kitchen"
+KITCHEN_NAV_STATIC_MAP_COLLISION_EXCLUDE_PRIMS = ("/World/envs/env_0/Robot",)
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class G1NavStaticMapExportConfig:
     bound_prim_path: str = DEFAULT_NAV_STATIC_MAP_BOUND_PRIM
     padding: float = 0.25
     exclude_prim_paths: tuple[str, ...] = DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS
+    collision_exclude_prim_paths: tuple[str, ...] = ()
     apply_collision_to_meshes: bool = True
     occupied_value: int = 100
     free_value: int = 0
@@ -50,9 +52,26 @@ def resolve_nav_static_map_scope(
         and bound_prim_path == DEFAULT_NAV_STATIC_MAP_BOUND_PRIM
         and exclude_prims == DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS
     ):
-        return KITCHEN_NAV_STATIC_MAP_BOUND_PRIM, DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS
+        return KITCHEN_NAV_STATIC_MAP_BOUND_PRIM, ("/World/envs/env_0/Object",)
 
     return bound_prim_path, exclude_prims
+
+
+def resolve_nav_static_map_collision_exclude_prims(
+    task_name: str,
+    bound_prim_path: str,
+    exclude_prim_paths: Iterable[str],
+) -> tuple[str, ...]:
+    """Resolve prims whose collision should be hidden, without deactivating them."""
+
+    if (
+        "Kitchen" in task_name
+        and bound_prim_path == DEFAULT_NAV_STATIC_MAP_BOUND_PRIM
+        and tuple(exclude_prim_paths) == DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS
+    ):
+        return KITCHEN_NAV_STATIC_MAP_COLLISION_EXCLUDE_PRIMS
+
+    return ()
 
 
 def export_g1_nav_static_map(config: G1NavStaticMapExportConfig) -> dict:
@@ -68,9 +87,17 @@ def export_g1_nav_static_map(config: G1NavStaticMapExportConfig) -> dict:
     excluded_prims = _set_prims_active(stage, config.exclude_prim_paths, active=False)
     applied_collision_count = 0
     visual_collision_layer = None
+    disabled_collision_layer = None
+    disabled_collision_count = 0
 
     try:
         min_bound, max_bound = _compute_xy_bounds(stage, config)
+        disabled_collision_layer, disabled_collision_count = (
+            _disable_collisions_for_mapping(
+                stage,
+                config.collision_exclude_prim_paths,
+            )
+        )
         if config.apply_collision_to_meshes:
             visual_collision_layer, applied_collision_count = (
                 _apply_visual_mesh_colliders_for_mapping(
@@ -103,12 +130,15 @@ def export_g1_nav_static_map(config: G1NavStaticMapExportConfig) -> dict:
             "resolution": config.cell_size,
             "origin": [float(min_bound[0]), float(min_bound[1]), 0.0],
             "excluded_prims": sorted(excluded_prims),
+            "disabled_collision_prim_count": disabled_collision_count,
             "applied_collision_to_mesh_count": applied_collision_count,
             "buffer_histogram": buffer_histogram,
         }
     finally:
         if visual_collision_layer is not None:
             _remove_session_layer(stage, visual_collision_layer)
+        if disabled_collision_layer is not None:
+            _remove_session_layer(stage, disabled_collision_layer)
         _restore_prims_active(stage, excluded_prims)
 
 
@@ -202,6 +232,37 @@ def _restore_prims_active(stage, prim_active_states: dict[str, bool]) -> None:
         prim = stage.GetPrimAtPath(prim_path)
         if prim and prim.IsValid():
             prim.SetActive(was_active)
+
+
+def _disable_collisions_for_mapping(
+    stage,
+    prim_paths: Iterable[str],
+) -> tuple[str, int]:
+    from pxr import Sdf, Usd, UsdPhysics
+
+    prim_paths = tuple(prim_paths)
+    if not prim_paths:
+        return "", 0
+
+    layer = Sdf.Layer.CreateAnonymous("anon_humanoid_nav_collision_disable")
+    session = stage.GetSessionLayer()
+    session.subLayerPaths.append(layer.identifier)
+    disabled_count = 0
+
+    with Usd.EditContext(stage, layer):
+        for prim_path in prim_paths:
+            root = stage.GetPrimAtPath(prim_path)
+            if not root or not root.IsValid():
+                continue
+            for prim in Usd.PrimRange(root):
+                if prim.HasAPI(UsdPhysics.CollisionAPI):
+                    collision_api = UsdPhysics.CollisionAPI(prim)
+                    collision_api.CreateCollisionEnabledAttr(False).Set(False)
+                    disabled_count += 1
+
+    if disabled_count:
+        _prime_omap_stage_updates()
+    return layer.identifier, disabled_count
 
 
 def _apply_visual_mesh_colliders_for_mapping(
