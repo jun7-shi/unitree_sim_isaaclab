@@ -50,7 +50,7 @@ def resolve_nav_static_map_scope(
         and bound_prim_path == DEFAULT_NAV_STATIC_MAP_BOUND_PRIM
         and exclude_prims == DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS
     ):
-        return KITCHEN_NAV_STATIC_MAP_BOUND_PRIM, ()
+        return KITCHEN_NAV_STATIC_MAP_BOUND_PRIM, DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS
 
     return bound_prim_path, exclude_prims
 
