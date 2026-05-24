@@ -10,23 +10,36 @@ Launch the G1 Kitchen task with the ROS2 clock and TF/odometry bridges enabled:
 ```bash
 cd /data/jun7.shi/code/poc/unitree/Manipulation/.worktrees/unitree-g1-nav-task
 conda run -n unitree_sim_lab python sim_main.py \
-  --device cpu \
+  --device cuda:0 \
   --enable_cameras \
   --task Isaac-Kitchen-G129-Dex1-Wholebody \
   --robot_type g129 \
-  --enable_dex1_dds \
   --enable_nav_ros_clock \
   --enable_nav_ros_tf_odom \
-  --headless
+  --enable_nav_udp_cmd_bridge \
+  --nav_minimal_dds \
+  --disable_image_server \
+  --no_render
 ```
 
 The V1.0 acceptance path is static-map navigation, so it does not require the
 PointCloud2 bridge. For V1.5 RGBD perception, add `--enable_nav_ros_pointcloud`
 when the active task exposes a depth-capable `front_camera`.
+`--disable_image_server` skips the unrelated teleimager ZMQ/WebRTC image server.
+`--nav_minimal_dds` starts only the robot state, run command, reset pose, and
+sim-state DDS objects needed for Nav2 command driving; it avoids hand/reward DDS
+publishers that are not part of the navigation loop. It also skips the task
+shared-memory camera observation path inside the walking action provider, so
+Nav2 camera data should be published through Isaac Sim's ROS2 bridge instead.
+When PointCloud2 is not enabled, the walking action provider also avoids a
+per-step IsaacLab render call; `sim_main.py` still pumps the Isaac Sim app loop
+so the ROS bridge OmniGraphs publish `/clock` and TF/odom. The Nav2 bridge still
+publishes optional ROS camera data through Isaac Sim's ROS2 bridge.
 
-Use `--headless` instead of `--no_render` when the PointCloud2 bridge is enabled.
-The camera `depth_pcl` publisher depends on Isaac Sim render product updates,
-and `--no_render` intentionally suppresses regular rendering.
+Use `--no_render` for the V1.0 static-map TF/odom path. Use `--headless`
+instead of `--no_render` when the PointCloud2 bridge is enabled. The camera
+`depth_pcl` publisher depends on Isaac Sim render product updates, and
+`--no_render` intentionally suppresses regular rendering.
 
 The bridge uses Isaac Sim's built-in `isaacsim.ros2.bridge` OmniGraph nodes and
 matches NVIDIA's scripted equivalents for the UI graph shortcuts:

@@ -2,16 +2,28 @@
 # License: Apache License, Version 2.0
 from dds.dds_master import dds_manager
 
+
+def nav_minimal_dds(args_cli):
+    return bool(getattr(args_cli, "nav_minimal_dds", False))
+
+
 def create_dds_objects(args_cli,env):
     publish_names = []
     subscribe_names = []
+    minimal_nav = nav_minimal_dds(args_cli)
     if args_cli.robot_type=="g129" or args_cli.robot_type=="h1_2":
         from dds.g1_robot_dds import G1RobotDDS
         g1_robot = G1RobotDDS()
         dds_manager.register_object("g129", g1_robot)
         publish_names.append("g129")
         subscribe_names.append("g129")
-    if args_cli.enable_dex3_dds:
+    if minimal_nav and (
+        args_cli.enable_dex1_dds
+        or args_cli.enable_dex3_dds
+        or args_cli.enable_inspire_dds
+    ):
+        print("[DDSManager] nav_minimal_dds enabled: skipping hand DDS objects")
+    elif args_cli.enable_dex3_dds:
         from dds.dex3_dds import Dex3DDS
         dex3 = Dex3DDS() 
         dds_manager.register_object("dex3", dex3)
@@ -43,13 +55,20 @@ def create_dds_objects(args_cli,env):
     sim_state_dds = SimStateDDS(env,args_cli.task)
     dds_manager.register_object("sim_state", sim_state_dds)
     publish_names.append("sim_state")
-    from dds.rewards_dds import RewardsDDS
-    rewards_dds = RewardsDDS(env,args_cli.task)
-    dds_manager.register_object("rewards", rewards_dds)
-    publish_names.append("rewards")
+    if minimal_nav:
+        print("[DDSManager] nav_minimal_dds enabled: skipping rewards DDS publisher")
+    else:
+        from dds.rewards_dds import RewardsDDS
+        rewards_dds = RewardsDDS(env,args_cli.task)
+        dds_manager.register_object("rewards", rewards_dds)
+        publish_names.append("rewards")
 
     dds_manager.start_publishing(publish_names)
-    dds_manager.start_subscribing(subscribe_names)
+    if minimal_nav:
+        print("[DDSManager] nav_minimal_dds enabled: skipping DDS subscribers")
+        dds_manager.start_subscribing([])
+    else:
+        dds_manager.start_subscribing(subscribe_names)
     return reset_pose_dds,sim_state_dds,dds_manager
 
 def create_dds_objects_replay(args_cli,env):

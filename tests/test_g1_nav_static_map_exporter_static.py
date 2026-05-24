@@ -28,6 +28,56 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn("--nav_udp_cmd_port", sim_main)
         self.assertIn("G1NavUdpCmdBridge", sim_main)
 
+    def test_sim_main_can_disable_image_server_for_nav_acceptance(self):
+        sim_main = (ROOT / "sim_main.py").read_text(encoding="utf-8")
+
+        self.assertIn("--disable_image_server", sim_main)
+        self.assertIn("args_cli.disable_image_server", sim_main)
+        self.assertIn("image server disabled", sim_main)
+        self.assertIn("image_server = None", sim_main)
+        self.assertIn("if image_server is not None", sim_main)
+        self.assertNotIn("\n        image_server.stop()", sim_main)
+
+    def test_sim_main_exposes_nav_minimal_dds_for_nav_acceptance(self):
+        sim_main = (ROOT / "sim_main.py").read_text(encoding="utf-8")
+        dds_create = (ROOT / "dds" / "dds_create.py").read_text(encoding="utf-8")
+        action_provider = (
+            ROOT / "action_provider" / "action_provider_wh_dds.py"
+        ).read_text(encoding="utf-8")
+        doc = (ROOT / "docs" / "humanoid_nav_ros_bridge.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("--nav_minimal_dds", sim_main)
+        self.assertIn("args_cli.nav_minimal_dds", sim_main)
+        self.assertIn("nav_minimal_dds", dds_create)
+        self.assertIn("skipping hand DDS", dds_create)
+        self.assertIn("skipping rewards DDS", dds_create)
+        self.assertIn("skipping DDS subscribers", dds_create)
+        self.assertIn("not args_cli.nav_minimal_dds", sim_main)
+        self.assertIn("elif args_cli.replay_data", sim_main)
+        self.assertIn("nav_ros_bridge_enabled", sim_main)
+        self.assertIn("simulation_app.update()", sim_main)
+        self.assertLess(
+            sim_main.index("nav_ros_bridge_enabled"),
+            sim_main.index("simulation_app.update()"),
+        )
+        self.assertIn("self.nav_minimal_dds", action_provider)
+        self.assertIn("self.nav_render_required", action_provider)
+        self.assertIn("enable_nav_ros_pointcloud", action_provider)
+        self.assertIn("not self.nav_minimal_dds", action_provider)
+        self.assertIn("self.nav_render_required", action_provider)
+        self.assertLess(
+            action_provider.index("not self.nav_minimal_dds"),
+            action_provider.index("self.env.observation_manager.compute()"),
+        )
+        self.assertLess(
+            action_provider.index("self.nav_render_required"),
+            action_provider.index("self.env.sim.render()"),
+        )
+        self.assertIn("--nav_minimal_dds", doc)
+        self.assertNotIn("--enable_dex1_dds", doc)
+
     def test_exporter_uses_official_isaac_sim_omap_api(self):
         exporter = (
             ROOT / "ros2_bridge" / "g1_nav_static_map_exporter.py"

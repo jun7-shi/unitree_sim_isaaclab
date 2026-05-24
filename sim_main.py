@@ -94,6 +94,7 @@ parser.add_argument("--enable_nav_udp_cmd_bridge", action="store_true", default=
 parser.add_argument("--nav_udp_cmd_host", type=str, default="127.0.0.1", help="UDP host/interface for the Nav2 command bridge")
 parser.add_argument("--nav_udp_cmd_port", type=int, default=18080, help="UDP port for the Nav2 command bridge")
 parser.add_argument("--nav_udp_cmd_stale_timeout", type=float, default=0.5, help="seconds before the Nav2 UDP command bridge writes a zero command")
+parser.add_argument("--nav_minimal_dds", action="store_true", default=False, help="start only the DDS objects required by Nav2 command driving")
 parser.add_argument("--export_nav_static_map", type=str, default="", help="export a Nav2 static occupancy map YAML/PGM from the current Unitree IsaacLab env and exit")
 parser.add_argument("--nav_static_map_cell_size", type=float, default=0.05, help="cell size in meters for --export_nav_static_map")
 parser.add_argument("--nav_static_map_origin", type=float, nargs=3, default=None, metavar=("X", "Y", "Z"), help="free start point for Isaac Sim occupancy map generation; defaults to the robot start x/y with z=0.1")
@@ -109,6 +110,7 @@ parser.add_argument("--camera_write_interval", type=int, default=None, help="cam
 
 
 parser.add_argument("--no_render",action="store_true",default=False,help="disable rendering updates entirely (overrides render interval)",)
+parser.add_argument("--disable_image_server", action="store_true", default=False, help="skip the teleimager image server for workflows that do not need ZMQ/WebRTC streams")
 parser.add_argument("--public_ip",type=str,default="127.0.0.1",help="public ip")
 parser.add_argument("--livestream_type", type=int, default=2, help="livestream type (0: no livestream, 1: WebRTC public network, 2:  WebRTC private network)")
 
@@ -138,6 +140,9 @@ if args_cli.enable_dex3_dds and args_cli.enable_dex1_dds and args_cli.enable_ins
     print("Error: enable_dex3_dds and enable_dex1_dds and enable_inspire_dds cannot be enabled at the same time")
     print("Please select one of the options")
     sys.exit(1)
+
+if args_cli.nav_minimal_dds:
+    print("[nav] minimal DDS startup enabled")
 
 
 import pinocchio                 
@@ -512,11 +517,12 @@ def main():
         except Exception as e:
             print(f"[nav_ros] failed to enable PointCloud2 bridge: {e}")
             return
-    if (
+    nav_ros_bridge_enabled = (
         args_cli.enable_nav_ros_clock
         or args_cli.enable_nav_ros_tf_odom
         or args_cli.enable_nav_ros_pointcloud
-    ):
+    )
+    if nav_ros_bridge_enabled:
         try:
             from ros2_bridge.g1_nav_clock_bridge import (
                 ensure_nav_ros_timeline_playing,
@@ -539,15 +545,19 @@ def main():
         return
     
     nav_udp_cmd_bridge = None
+    image_server = None
 
     if not args_cli.replay_data:
-        print("========= create image server =========")
-        try:
-            image_server = run_isaacsim_server()
-        except Exception as e:
-            print(f"Failed to create image server: {e}")
-            return
-        print("========= create image server success =========")
+        if args_cli.disable_image_server:
+            print("========= image server disabled =========")
+        else:
+            print("========= create image server =========")
+            try:
+                image_server = run_isaacsim_server()
+            except Exception as e:
+                print(f"Failed to create image server: {e}")
+                return
+            print("========= create image server success =========")
         print("========= create dds =========")
         try:
             reset_pose_dds,sim_state_dds,dds_manager = create_dds_objects(args_cli,env)
@@ -646,13 +656,18 @@ def main():
         
         
         reward_interval = max(1, args_cli.reward_interval)
+        nav_ros_app_update_required = (
+            args_cli.nav_minimal_dds
+            and nav_ros_bridge_enabled
+            and not args_cli.enable_nav_ros_pointcloud
+        )
 
         # use torch.inference_mode() and exception suppression
         with contextlib.suppress(KeyboardInterrupt), torch.inference_mode():
             while simulation_app.is_running() and controller.is_running:
                 current_time = time.time()
                 loop_count += 1
-                if not args_cli.replay_data:
+                if not args_cli.replay_data and not args_cli.nav_minimal_dds:
                     try:
                         env_state = env.scene.get_state()
                         env_state_json =  sim_state_to_json(env_state)
@@ -694,7 +709,7 @@ def main():
                         except Exception as e:
                             print(f"Failed to write reset pose command: {e}")
                             raise e
-                else:
+                elif args_cli.replay_data:
                     if action_provider.get_start_loop() and data_idx<len(data_json_list):
                         print(f"data_idx: {data_idx}")
                         try:
@@ -725,6 +740,8 @@ def main():
                 
                 # execute control step (in main thread, support rendering)
                 controller.step()
+                if nav_ros_app_update_required:
+                    simulation_app.update()
 
                 # print statistics and loop frequency periodically
                 if current_time - last_stats_time >= args_cli.stats_interval:
@@ -775,7 +792,8 @@ def main():
         if nav_udp_cmd_bridge is not None:
             nav_udp_cmd_bridge.stop()
         controller.cleanup()
-        image_server.stop()
+        if image_server is not None:
+            image_server.stop()
         env.close()
         print("cleanup completed")
     # profiler.disable()

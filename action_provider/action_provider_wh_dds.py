@@ -23,6 +23,11 @@ class DDSRLActionProvider(ActionProvider):
         self.enable_dex3 = args_cli.enable_dex3_dds
         self.enable_inspire = args_cli.enable_inspire_dds
         self.wh = args_cli.enable_wholebody_dds
+        self.nav_minimal_dds = bool(getattr(args_cli, "nav_minimal_dds", False))
+        self.nav_render_required = (
+            not self.nav_minimal_dds
+            or bool(getattr(args_cli, "enable_nav_ros_pointcloud", False))
+        )
         self.policy_path = f"{project_root}/"+args_cli.model_path
         self.env = env
         # Initialize DDS communication
@@ -441,8 +446,10 @@ class DDSRLActionProvider(ActionProvider):
                 self.env.sim.step(render=False)                              
                 self.env.scene.update(dt=self.env.physics_dt)                    
 
-            self.env.sim.render()
-            self.env.observation_manager.compute()
+            if self.nav_render_required:
+                self.env.sim.render()
+            if not self.nav_minimal_dds:
+                self.env.observation_manager.compute()
             
         except Exception as e:
             print(f"[{self.name}] Get DDS action failed: {e}")

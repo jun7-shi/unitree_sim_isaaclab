@@ -102,6 +102,9 @@ class G1NavRosBridgeStaticTests(unittest.TestCase):
 
         self.assertIn("--enable_nav_ros_tf_odom", doc)
         self.assertIn("--enable_nav_ros_clock", doc)
+        self.assertIn("--enable_nav_udp_cmd_bridge", doc)
+        self.assertIn("--disable_image_server", doc)
+        self.assertIn("--no_render", doc)
         self.assertIn("/clock", doc)
         self.assertIn("Isaac-Kitchen-G129-Dex1-Wholebody", doc)
         self.assertNotIn("Isaac-Move-Cylinder-G129-Dex1-Wholebody-Nav", doc)
