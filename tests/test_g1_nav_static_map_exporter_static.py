@@ -133,6 +133,23 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn('utils.setCollider(prim, "none")', exporter)
         self.assertIn("_remove_session_layer", exporter)
 
+    def test_exporter_removes_rigid_bodies_before_mapping_colliders(self):
+        exporter = (
+            ROOT / "ros2_bridge" / "g1_nav_static_map_exporter.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("if prim.HasAPI(UsdPhysics.RigidBodyAPI):", exporter)
+        self.assertIn("utils.removePhysics(prim)", exporter)
+        self.assertLess(
+            exporter.index("if prim.HasAPI(UsdPhysics.RigidBodyAPI):"),
+            exporter.index('utils.setCollider(prim, "none")'),
+        )
+        self.assertNotIn(
+            "prim.HasAPI(UsdPhysics.CollisionAPI) and prim.HasAPI(\n"
+            "                UsdPhysics.RigidBodyAPI",
+            exporter,
+        )
+
     def test_exporter_temporarily_excludes_robot_and_object(self):
         exporter = (
             ROOT / "ros2_bridge" / "g1_nav_static_map_exporter.py"

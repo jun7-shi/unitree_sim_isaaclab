@@ -283,9 +283,7 @@ def _apply_visual_mesh_colliders_for_mapping(
 
     with Usd.EditContext(stage, layer):
         for prim in Usd.PrimRange(root):
-            if prim.HasAPI(UsdPhysics.CollisionAPI) and prim.HasAPI(
-                UsdPhysics.RigidBodyAPI
-            ):
+            if prim.HasAPI(UsdPhysics.RigidBodyAPI):
                 utils.removePhysics(prim)
 
         _prime_omap_stage_updates()
