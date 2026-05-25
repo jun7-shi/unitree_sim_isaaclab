@@ -113,6 +113,7 @@ parser.add_argument("--nav_static_map_z_bounds", type=float, nargs=2, default=(0
 parser.add_argument("--nav_static_map_bound_prim", type=str, default=DEFAULT_NAV_STATIC_MAP_BOUND_PRIM, help="USD prim whose world bounds define the XY occupancy map extent")
 parser.add_argument("--nav_static_map_padding", type=float, default=0.25, help="extra XY padding around --nav_static_map_bound_prim")
 parser.add_argument("--nav_static_map_exclude_prims", type=str, nargs="*", default=list(DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS), help="prim paths to temporarily deactivate while exporting the static map")
+parser.add_argument("--nav_static_map_include_prims", type=str, nargs="*", default=None, help="if set, deactivate sibling prims under the resolved bound prim except these include prims")
 parser.add_argument("--nav_static_map_patch_prims", type=str, nargs="*", default=None, help="additional prim paths to export separately and OR into the static map; omit for task defaults, pass the flag with no values to disable")
 parser.add_argument("--nav_static_map_no_mesh_collision", action="store_true", default=False, help="do not temporarily apply CollisionAPI to static meshes before occupancy map export")
 
@@ -466,6 +467,7 @@ def main():
                     padding=args_cli.nav_static_map_padding,
                     exclude_prim_paths=exclude_prim_paths,
                     collision_exclude_prim_paths=collision_exclude_prim_paths,
+                    include_prim_paths=tuple(args_cli.nav_static_map_include_prims or ()),
                     patch_prim_paths=patch_prim_paths,
                     apply_collision_to_meshes=not args_cli.nav_static_map_no_mesh_collision,
                 )

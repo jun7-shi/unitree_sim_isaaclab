@@ -16,12 +16,14 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn("--nav_static_map_z_bounds", sim_main)
         self.assertIn("--nav_static_map_bound_prim", sim_main)
         self.assertIn("--nav_static_map_exclude_prims", sim_main)
+        self.assertIn("--nav_static_map_include_prims", sim_main)
         self.assertIn("--nav_static_map_no_mesh_collision", sim_main)
         self.assertIn("--nav_static_map_patch_prims", sim_main)
         self.assertIn('env.scene["robot"].data.root_pos_w', sim_main)
         self.assertIn("resolve_nav_static_map_collision_exclude_prims", sim_main)
         self.assertIn("resolve_nav_static_map_patch_prims", sim_main)
         self.assertIn("collision_exclude_prim_paths", sim_main)
+        self.assertIn("include_prim_paths", sim_main)
         self.assertIn("patch_prim_paths", sim_main)
         self.assertIn("export_g1_nav_static_map", sim_main)
 
@@ -124,6 +126,21 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn("_apply_visual_mesh_colliders_for_mapping", exporter)
         self.assertIn("UsdPhysics.CollisionAPI.Apply", exporter)
         self.assertIn("UsdGeom.Mesh", exporter)
+
+    def test_exporter_skips_light_prims_for_mapping(self):
+        exporter = (
+            ROOT / "ros2_bridge" / "g1_nav_static_map_exporter.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("_is_light_prim", exporter)
+        self.assertIn("UsdLux", exporter)
+        self.assertIn("BoundableLightBase", exporter)
+        self.assertIn("LightAPI", exporter)
+        self.assertIn("_should_skip_navigation_bound_prim", exporter)
+        self.assertLess(
+            exporter.index("if _should_skip_visual_collider_prim(prim):"),
+            exporter.index("UsdPhysics.CollisionAPI.Apply(prim)"),
+        )
 
     def test_exporter_uses_occupancy_ui_visual_mesh_layer_pattern(self):
         exporter = (
@@ -233,6 +250,31 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertEqual(
             patch_prims,
             ("/World/envs/env_0/Kitchen/CustomPatch",),
+        )
+
+    def test_include_only_excludes_unselected_bound_children(self):
+        from ros2_bridge.g1_nav_static_map_exporter import (
+            _resolve_include_only_exclude_paths,
+        )
+
+        excluded = _resolve_include_only_exclude_paths(
+            "/World/envs/env_0/Kitchen",
+            (
+                "/World/envs/env_0/Kitchen/Kitchen_Cabinet001_01",
+                "/World/envs/env_0/Kitchen/Kitchen_Cabinet002",
+                "/World/envs/env_0/Kitchen/Microwave017",
+            ),
+            (
+                "/World/envs/env_0/Kitchen/Kitchen_Cabinet002/Kitchen_Cabinet002",
+            ),
+        )
+
+        self.assertEqual(
+            excluded,
+            (
+                "/World/envs/env_0/Kitchen/Kitchen_Cabinet001_01",
+                "/World/envs/env_0/Kitchen/Microwave017",
+            ),
         )
 
     def test_static_map_patch_merge_only_or_adds_occupied_cells(self):

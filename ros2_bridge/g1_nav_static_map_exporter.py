@@ -36,6 +36,7 @@ class G1NavStaticMapExportConfig:
     padding: float = 0.25
     exclude_prim_paths: tuple[str, ...] = DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS
     collision_exclude_prim_paths: tuple[str, ...] = ()
+    include_prim_paths: tuple[str, ...] = ()
     patch_prim_paths: tuple[str, ...] = ()
     apply_collision_to_meshes: bool = True
     occupied_value: int = 100
@@ -111,7 +112,16 @@ def export_g1_nav_static_map(config: G1NavStaticMapExportConfig) -> dict:
     from isaacsim.asset.gen.omap.bindings import _omap
 
     stage = omni.usd.get_context().get_stage()
-    excluded_prims = _set_prims_active(stage, config.exclude_prim_paths, active=False)
+    include_only_exclude_prim_paths = _resolve_include_only_exclude_prims(
+        stage,
+        config.bound_prim_path,
+        config.include_prim_paths,
+    )
+    excluded_prims = _set_prims_active(
+        stage,
+        tuple(config.exclude_prim_paths) + include_only_exclude_prim_paths,
+        active=False,
+    )
     applied_collision_count = 0
     visual_collision_layer = None
     disabled_collision_layer = None
@@ -377,6 +387,59 @@ def _restore_prims_active(stage, prim_active_states: dict[str, bool]) -> None:
             prim.SetActive(was_active)
 
 
+def _resolve_include_only_exclude_prims(
+    stage,
+    bound_prim_path: str,
+    include_prim_paths: Iterable[str],
+) -> tuple[str, ...]:
+    include_prim_paths = tuple(include_prim_paths)
+    if not include_prim_paths:
+        return ()
+
+    root = stage.GetPrimAtPath(bound_prim_path)
+    if not root or not root.IsValid():
+        return ()
+
+    child_paths = tuple(child.GetPath().pathString for child in root.GetChildren())
+    return _resolve_include_only_exclude_paths(
+        bound_prim_path,
+        child_paths,
+        include_prim_paths,
+    )
+
+
+def _resolve_include_only_exclude_paths(
+    bound_prim_path: str,
+    child_prim_paths: Iterable[str],
+    include_prim_paths: Iterable[str],
+) -> tuple[str, ...]:
+    """Return direct bound children to deactivate for include-only map export."""
+
+    child_prim_paths = tuple(child_prim_paths)
+    include_prim_paths = tuple(include_prim_paths)
+    if not include_prim_paths:
+        return ()
+
+    normalized_bound_path = bound_prim_path.rstrip("/")
+    keep_child_paths = set()
+    for include_path in include_prim_paths:
+        normalized_include_path = include_path.rstrip("/")
+        if normalized_include_path == normalized_bound_path:
+            return ()
+        for child_path in child_prim_paths:
+            normalized_child_path = child_path.rstrip("/")
+            if (
+                normalized_include_path == normalized_child_path
+                or normalized_include_path.startswith(normalized_child_path + "/")
+            ):
+                keep_child_paths.add(child_path)
+                break
+
+    return tuple(
+        child_path for child_path in child_prim_paths if child_path not in keep_child_paths
+    )
+
+
 def _disable_collisions_for_mapping(
     stage,
     prim_paths: Iterable[str],
@@ -464,6 +527,9 @@ def _apply_visual_mesh_colliders_for_mapping(
 def _should_skip_visual_collider_prim(prim) -> bool:
     from pxr import Usd, UsdGeom
 
+    if _is_light_prim(prim):
+        return True
+
     imageable = UsdGeom.Imageable(prim)
     if imageable:
         visibility = imageable.ComputeVisibility(Usd.TimeCode.Default())
@@ -476,6 +542,28 @@ def _should_skip_visual_collider_prim(prim) -> bool:
         return points is None or len(points) == 0
 
     return False
+
+
+def _is_light_prim(prim) -> bool:
+    name = prim.GetName()
+    if name and "light" in str(name).lower():
+        return True
+
+    type_name = prim.GetTypeName()
+    if type_name and str(type_name).endswith("Light"):
+        return True
+
+    try:
+        from pxr import UsdLux
+    except Exception:
+        return False
+
+    boundable_light_base = getattr(UsdLux, "BoundableLightBase", None)
+    if boundable_light_base is not None and prim.IsA(boundable_light_base):
+        return True
+
+    light_api = getattr(UsdLux, "LightAPI", None)
+    return light_api is not None and prim.HasAPI(light_api)
 
 
 def _has_triangle_mesh_collider(prim) -> bool:
@@ -501,21 +589,55 @@ def _compute_xy_bounds(stage, config: G1NavStaticMapExportConfig):
         raise RuntimeError(f"static map bound prim not found: {config.bound_prim_path}")
 
     bbox_cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), ["default", "render", "proxy"])
-    bbox_range = bbox_cache.ComputeWorldBound(prim).ComputeAlignedBox()
-    min_point = bbox_range.GetMin()
-    max_point = bbox_range.GetMax()
+    bounds = []
+    candidates = tuple(prim.GetChildren()) or (prim,)
+    for candidate in candidates:
+        if _should_skip_navigation_bound_prim(candidate):
+            continue
+        bbox_range = bbox_cache.ComputeWorldBound(candidate).ComputeAlignedBox()
+        if bbox_range.IsEmpty():
+            continue
+        bounds.append(bbox_range)
+
+    if bounds:
+        min_point = bounds[0].GetMin()
+        max_point = bounds[0].GetMax()
+        min_x = float(min_point[0])
+        min_y = float(min_point[1])
+        max_x = float(max_point[0])
+        max_y = float(max_point[1])
+        for bbox_range in bounds[1:]:
+            candidate_min = bbox_range.GetMin()
+            candidate_max = bbox_range.GetMax()
+            min_x = min(min_x, float(candidate_min[0]))
+            min_y = min(min_y, float(candidate_min[1]))
+            max_x = max(max_x, float(candidate_max[0]))
+            max_y = max(max_y, float(candidate_max[1]))
+    else:
+        bbox_range = bbox_cache.ComputeWorldBound(prim).ComputeAlignedBox()
+        min_point = bbox_range.GetMin()
+        max_point = bbox_range.GetMax()
+        min_x = float(min_point[0])
+        min_y = float(min_point[1])
+        max_x = float(max_point[0])
+        max_y = float(max_point[1])
+
     min_z, max_z = config.z_bounds
     min_bound = (
-        float(min_point[0]) - config.padding,
-        float(min_point[1]) - config.padding,
+        min_x - config.padding,
+        min_y - config.padding,
         float(min_z),
     )
     max_bound = (
-        float(max_point[0]) + config.padding,
-        float(max_point[1]) + config.padding,
+        max_x + config.padding,
+        max_y + config.padding,
         float(max_z),
     )
     return min_bound, max_bound
+
+
+def _should_skip_navigation_bound_prim(prim) -> bool:
+    return _is_light_prim(prim)
 
 
 def _buffer_histogram(buffer) -> dict[int, int]:
