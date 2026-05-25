@@ -63,6 +63,17 @@ class KitchenSceneCfg(InteractiveSceneCfg):
 
 
 @configclass
+class KitchenNavSceneCfg(KitchenSceneCfg):
+    """Kitchen scene variant using the package-owned G1 nav USD and RGBD camera."""
+
+    robot: ArticulationCfg = G1RobotPresets.g1_29dof_dex1_wholebody_nav(
+        init_pos=(1.58, -0.36, 0.8),
+        init_rot=(0.17364817766693041, 0.0, 0.0, 0.984807753012208),
+    )
+    front_camera = CameraPresets.g1_nav_depth_camera()
+
+
+@configclass
 class ActionsCfg:
     joint_pos = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=1.0, use_default_offset=True)
 
@@ -135,3 +146,14 @@ class KitchenG129Dex1WholebodyEnvCfg(ManagerBasedRLEnvCfg):
                 )
             ),
         )
+
+
+@configclass
+class KitchenG129Dex1WholebodyNavEnvCfg(KitchenG129Dex1WholebodyEnvCfg):
+    """Navigation-ready Kitchen G1 task with a head RGBD camera."""
+
+    scene: KitchenNavSceneCfg = KitchenNavSceneCfg(
+        num_envs=1,
+        env_spacing=2.5,
+        replicate_physics=True,
+    )

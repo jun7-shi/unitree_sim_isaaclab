@@ -14,3 +14,12 @@ gym.register(
     },
     disable_env_checker=True,
 )
+
+gym.register(
+    id="Isaac-Kitchen-G129-Dex1-Wholebody-Nav",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": kitchen_g1_29dof_dex1_hw_env_cfg.KitchenG129Dex1WholebodyNavEnvCfg,
+    },
+    disable_env_checker=True,
+)

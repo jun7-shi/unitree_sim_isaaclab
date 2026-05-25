@@ -94,8 +94,12 @@ parser.add_argument(
 )
 parser.add_argument("--enable_nav_ros_pointcloud", action="store_true", default=False, help="enable ROS2 PointCloud2 bridge for the G1 head RGBD camera")
 parser.add_argument("--nav_ros_pointcloud_graph_path", type=str, default="/ActionGraph/HumanoidNavPointCloud", help="OmniGraph path for the navigation ROS2 PointCloud2 bridge")
+parser.add_argument("--enable_nav_ros_rgbd_images", action="store_true", default=False, help="enable ROS2 RGB/depth image bridge for the G1 head RGBD camera")
+parser.add_argument("--nav_ros_rgbd_graph_path", type=str, default="/ActionGraph/HumanoidNavRgbdImages", help="OmniGraph path for the navigation ROS2 RGB/depth image bridge")
 parser.add_argument("--nav_ros_camera_prim_path", type=str, default=None, help="explicit camera prim path for the navigation ROS2 PointCloud2 bridge")
 parser.add_argument("--nav_ros_pointcloud_topic", type=str, default="/g1/head_rgbd/points", help="ROS2 PointCloud2 topic for the G1 head RGBD camera")
+parser.add_argument("--nav_ros_rgb_topic", type=str, default="/g1/head_rgbd/rgb/image_raw", help="ROS2 RGB image topic for the G1 head RGBD camera")
+parser.add_argument("--nav_ros_depth_topic", type=str, default="/g1/head_rgbd/depth/image_raw", help="ROS2 depth image topic for the G1 head RGBD camera")
 parser.add_argument("--nav_ros_camera_info_topic", type=str, default="/g1/head_rgbd/camera_info", help="ROS2 CameraInfo topic for the G1 head RGBD camera")
 parser.add_argument("--nav_ros_camera_frame", type=str, default="g1_head_d435_depth_optical_frame", help="ROS2 frame id for the G1 head RGBD PointCloud2")
 parser.add_argument("--nav_ros_node_namespace", type=str, default="", help="ROS2 node namespace for humanoid navigation camera publishers")
@@ -546,10 +550,36 @@ def main():
         except Exception as e:
             print(f"[nav_ros] failed to enable PointCloud2 bridge: {e}")
             return
+    if args_cli.enable_nav_ros_rgbd_images:
+        try:
+            from ros2_bridge.g1_nav_rgbd_image_bridge import (
+                G1NavRgbdImageBridgeConfig,
+                create_g1_nav_rgbd_image_graph,
+            )
+
+            rgbd_info = create_g1_nav_rgbd_image_graph(
+                env,
+                G1NavRgbdImageBridgeConfig(
+                    graph_path=args_cli.nav_ros_rgbd_graph_path,
+                    camera_prim_path=args_cli.nav_ros_camera_prim_path,
+                    rgb_topic=args_cli.nav_ros_rgb_topic,
+                    depth_topic=args_cli.nav_ros_depth_topic,
+                    camera_info_topic=args_cli.nav_ros_camera_info_topic,
+                    frame_id=args_cli.nav_ros_camera_frame,
+                    node_namespace=args_cli.nav_ros_node_namespace,
+                    width=args_cli.nav_ros_camera_width,
+                    height=args_cli.nav_ros_camera_height,
+                ),
+            )
+            print(f"[nav_ros] RGBD image bridge enabled: {rgbd_info}")
+        except Exception as e:
+            print(f"[nav_ros] failed to enable RGBD image bridge: {e}")
+            return
     nav_ros_bridge_enabled = (
         args_cli.enable_nav_ros_clock
         or args_cli.enable_nav_ros_tf_odom
         or args_cli.enable_nav_ros_pointcloud
+        or args_cli.enable_nav_ros_rgbd_images
     )
     if nav_ros_bridge_enabled:
         try:

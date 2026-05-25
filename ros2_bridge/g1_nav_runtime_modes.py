@@ -17,9 +17,12 @@ def action_provider_render_interval(args_cli):
 
     The Wholebody action provider owns the manual render call. GUI runs default
     to every provider tick so the viewport FPS reflects actual loop throughput.
-    PointCloud2 mode also needs every render tick for render-product updates.
+    Camera bridge modes also need every render tick for render-product updates.
     """
-    if _enabled(args_cli, "enable_nav_ros_pointcloud"):
+    if _enabled(args_cli, "enable_nav_ros_pointcloud") or _enabled(
+        args_cli,
+        "enable_nav_ros_rgbd_images",
+    ):
         return 1
     if _enabled(args_cli, "no_render"):
         return 0
@@ -43,4 +46,5 @@ def should_update_nav_ros_app(args_cli, nav_ros_bridge_enabled):
         and _enabled(args_cli, "nav_minimal_dds")
         and bool(nav_ros_bridge_enabled)
         and not _enabled(args_cli, "enable_nav_ros_pointcloud")
+        and not _enabled(args_cli, "enable_nav_ros_rgbd_images")
     )

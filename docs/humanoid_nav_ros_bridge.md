@@ -22,8 +22,11 @@ conda run -n unitree_sim_lab python sim_main.py \
 ```
 
 The V1.0 acceptance path is static-map navigation, so it does not require the
-PointCloud2 bridge. For V1.5 RGBD perception, add `--enable_nav_ros_pointcloud`
-when the active task exposes a depth-capable `front_camera`.
+RGBD image bridge. For V1.5 RGBD perception, use
+`Isaac-Kitchen-G129-Dex1-Wholebody-Nav` and add
+`--enable_nav_ros_rgbd_images`; Isaac Sim publishes RGB/depth images and the ROS
+workspace locally downsamples depth into `/g1/head_rgbd/points` for Nav2
+VoxelLayer.
 `--disable_image_server` skips the unrelated teleimager ZMQ/WebRTC image server.
 `--nav_minimal_dds` starts only the robot state, run command, reset pose, and
 sim-state DDS objects needed for Nav2 command driving; it avoids hand/reward DDS
@@ -35,8 +38,8 @@ For GUI V1 performance debugging, `--nav_minimal_dds` renders the
 action-provider view every provider tick by default. Use
 `--nav_action_render_interval 4` or a larger interval only when intentionally
 trading viewport smoothness for loop throughput. This knob does not apply when
-`--enable_nav_ros_pointcloud` is active; the point cloud ROS graph keeps
-rendering every tick so the render product stays current.
+a navigation camera bridge is active; the camera ROS graph keeps rendering
+every tick so the render product stays current.
 
 With profiling enabled, the Wholebody action provider prints
 `[NavActionProfile]` averages every `--profile_interval` provider ticks. Use
@@ -48,9 +51,9 @@ Add `--no_render` for the V1.0 static-map TF/odom path when running without a
 GUI. In that mode the walking action provider skips regular render and
 observation-manager updates, and `sim_main.py` explicitly pumps the Isaac Sim
 app loop so the ROS bridge OmniGraphs publish `/clock` and TF/odom. Use
-`--headless` instead of `--no_render` when the PointCloud2 bridge is enabled.
-The camera `depth_pcl` publisher depends on Isaac Sim render product updates,
-and `--no_render` intentionally suppresses regular rendering.
+`--headless` instead of `--no_render` when the RGBD image bridge is enabled.
+The camera image publishers depend on Isaac Sim render product updates, and
+`--no_render` intentionally suppresses regular rendering.
 
 The bridge uses Isaac Sim's built-in `isaacsim.ros2.bridge` OmniGraph nodes and
 matches NVIDIA's scripted equivalents for the UI graph shortcuts:
@@ -63,7 +66,8 @@ Camera shortcut:
 OnPlaybackTick -> OgnIsaacRunOneSimulationFrame
   -> IsaacCreateRenderProduct
   -> ROS2CameraInfoHelper
-  -> ROS2CameraHelper(type=depth_pcl)
+  -> ROS2CameraHelper(type=rgb)
+  -> ROS2CameraHelper(type=depth)
 ```
 
 ROS contract:
@@ -73,7 +77,8 @@ map -> odom -> base_link
 /clock rosgraph_msgs/Clock
 /odom nav_msgs/Odometry
 /g1/head_rgbd/camera_info sensor_msgs/CameraInfo
-/g1/head_rgbd/points sensor_msgs/PointCloud2
+/g1/head_rgbd/rgb/image_raw sensor_msgs/Image
+/g1/head_rgbd/depth/image_raw sensor_msgs/Image
 ```
 
 `/odom` is local odometry and starts near zero at bridge creation. The bridge
@@ -93,8 +98,9 @@ clock_topic: /clock
 odom_topic: /odom
 tf_topic: tf
 camera_info_topic: /g1/head_rgbd/camera_info
-pointcloud_topic: /g1/head_rgbd/points
-pointcloud_frame: g1_head_d435_depth_optical_frame
+rgb_topic: /g1/head_rgbd/rgb/image_raw
+depth_topic: /g1/head_rgbd/depth/image_raw
+camera_frame: g1_head_d435_depth_optical_frame
 ```
 
 ## Verification
@@ -109,8 +115,9 @@ ros2 topic hz /odom
 ros2 topic echo --once /odom.header.frame_id
 ros2 topic echo --once /odom.child_frame_id
 ros2 topic echo --once /g1/head_rgbd/camera_info.header.frame_id
-ros2 topic hz /g1/head_rgbd/points
-ros2 topic echo --once /g1/head_rgbd/points.header.frame_id
+ros2 topic hz /g1/head_rgbd/rgb/image_raw
+ros2 topic hz /g1/head_rgbd/depth/image_raw
+ros2 topic echo --once /g1/head_rgbd/depth/image_raw.header.frame_id
 ```
 
 Expected values:
@@ -119,7 +126,26 @@ Expected values:
 /odom.header.frame_id: odom
 /odom.child_frame_id: base_link
 /g1/head_rgbd/camera_info.header.frame_id: g1_head_d435_depth_optical_frame
-/g1/head_rgbd/points.header.frame_id: g1_head_d435_depth_optical_frame
+/g1/head_rgbd/depth/image_raw.header.frame_id: g1_head_d435_depth_optical_frame
+```
+
+## Legacy Direct PointCloud2 Bridge
+
+`--enable_nav_ros_pointcloud` remains available as a debugging path for Isaac
+Sim's built-in `ROS2CameraHelper(type=depth_pcl)`, but it is not the V1.5
+default because it publishes the full point cloud over the Isaac Sim ROS bridge.
+
+Legacy contract:
+
+```text
+/g1/head_rgbd/points sensor_msgs/PointCloud2
+```
+
+Legacy verification:
+
+```bash
+ros2 topic hz /g1/head_rgbd/points
+ros2 topic echo --once /g1/head_rgbd/points.header.frame_id
 ```
 
 No conda packages are required for this bridge. ROS publishing is handled by

@@ -82,6 +82,24 @@ class G1NavTaskStaticTests(unittest.TestCase):
         self.assertIn("/World/envs/env_.*/Kitchen", kitchen_cfg)
         self.assertIn("g1_29dof_dex1_wholebody", kitchen_cfg)
 
+    def test_kitchen_nav_task_uses_nav_usd_and_rgbd_camera(self):
+        task_init = (ROOT / "tasks/g1_tasks/__init__.py").read_text(encoding="utf-8")
+        kitchen_init = (
+            ROOT / "tasks/g1_tasks/kitchen_g1_29dof_dex1_wholebody/__init__.py"
+        ).read_text(encoding="utf-8")
+        kitchen_cfg = (
+            ROOT
+            / "tasks/g1_tasks/kitchen_g1_29dof_dex1_wholebody/"
+            "kitchen_g1_29dof_dex1_hw_env_cfg.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("kitchen_g1_29dof_dex1_wholebody", task_init)
+        self.assertIn("Isaac-Kitchen-G129-Dex1-Wholebody-Nav", kitchen_init)
+        self.assertIn("KitchenG129Dex1WholebodyNavEnvCfg", kitchen_init)
+        self.assertIn("KitchenNavSceneCfg", kitchen_cfg)
+        self.assertIn("g1_29dof_dex1_wholebody_nav", kitchen_cfg)
+        self.assertIn("g1_nav_depth_camera", kitchen_cfg)
+
 
 if __name__ == "__main__":
     unittest.main()
