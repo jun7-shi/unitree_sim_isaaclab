@@ -5,7 +5,8 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+import math
 from pathlib import Path
 from typing import Iterable
 
@@ -17,6 +18,9 @@ DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS = (
 )
 KITCHEN_NAV_STATIC_MAP_BOUND_PRIM = "/World/envs/env_0/Kitchen"
 KITCHEN_NAV_STATIC_MAP_COLLISION_EXCLUDE_PRIMS = ("/World/envs/env_0/Robot",)
+KITCHEN_NAV_STATIC_MAP_PATCH_PRIMS = (
+    "/World/envs/env_0/Kitchen/Kitchen_InsularShelf_01",
+)
 
 
 @dataclass(frozen=True)
@@ -31,6 +35,7 @@ class G1NavStaticMapExportConfig:
     padding: float = 0.25
     exclude_prim_paths: tuple[str, ...] = DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS
     collision_exclude_prim_paths: tuple[str, ...] = ()
+    patch_prim_paths: tuple[str, ...] = ()
     apply_collision_to_meshes: bool = True
     occupied_value: int = 100
     free_value: int = 0
@@ -74,6 +79,27 @@ def resolve_nav_static_map_collision_exclude_prims(
     return ()
 
 
+def resolve_nav_static_map_patch_prims(
+    task_name: str,
+    bound_prim_path: str,
+    exclude_prim_paths: Iterable[str],
+    patch_prim_paths: Iterable[str] | None,
+) -> tuple[str, ...]:
+    """Resolve additional prims to export separately and OR into the static map."""
+
+    if patch_prim_paths is not None:
+        return tuple(patch_prim_paths)
+
+    if (
+        "Kitchen" in task_name
+        and bound_prim_path == DEFAULT_NAV_STATIC_MAP_BOUND_PRIM
+        and tuple(exclude_prim_paths) == DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS
+    ):
+        return KITCHEN_NAV_STATIC_MAP_PATCH_PRIMS
+
+    return ()
+
+
 def export_g1_nav_static_map(config: G1NavStaticMapExportConfig) -> dict:
     """Generate a Nav2 map YAML and PGM image from the current USD stage."""
 
@@ -109,7 +135,15 @@ def export_g1_nav_static_map(config: G1NavStaticMapExportConfig) -> dict:
         generator = _export_with_generator(stage, config, min_bound, max_bound)
 
         width, height, _depth = tuple(generator.get_dimensions())
-        buffer = generator.get_buffer()
+        buffer = list(generator.get_buffer()[: width * height])
+        patch_maps, patched_occupied_cell_count = _export_and_merge_patch_maps(
+            stage,
+            config,
+            buffer,
+            width=width,
+            height=height,
+            min_bound=min_bound,
+        )
         buffer_histogram = _buffer_histogram(buffer)
         output_yaml, output_image = _resolve_output_paths(config.output_yaml)
         _write_pgm(
@@ -132,6 +166,8 @@ def export_g1_nav_static_map(config: G1NavStaticMapExportConfig) -> dict:
             "excluded_prims": sorted(excluded_prims),
             "disabled_collision_prim_count": disabled_collision_count,
             "applied_collision_to_mesh_count": applied_collision_count,
+            "patch_maps": patch_maps,
+            "patched_occupied_cell_count": patched_occupied_cell_count,
             "buffer_histogram": buffer_histogram,
         }
     finally:
@@ -169,6 +205,112 @@ def _export_with_generator(stage, config, min_bound, max_bound):
         _restore_timeline_state(was_playing)
 
     return generator
+
+
+def _export_and_merge_patch_maps(
+    stage,
+    config: G1NavStaticMapExportConfig,
+    base_buffer,
+    *,
+    width: int,
+    height: int,
+    min_bound,
+) -> tuple[list[dict], int]:
+    patch_maps = []
+    total_added = 0
+
+    for patch_prim_path in config.patch_prim_paths:
+        patch_config = replace(config, bound_prim_path=patch_prim_path)
+        patch_min_bound, patch_max_bound = _compute_xy_bounds(stage, patch_config)
+        patch_origin = _patch_origin_from_bounds(patch_min_bound, patch_max_bound, config)
+        patch_config = replace(patch_config, origin=patch_origin, patch_prim_paths=())
+        patch_generator = _export_with_generator(
+            stage,
+            patch_config,
+            patch_min_bound,
+            patch_max_bound,
+        )
+        patch_width, patch_height, _patch_depth = tuple(patch_generator.get_dimensions())
+        patch_buffer = list(patch_generator.get_buffer()[: patch_width * patch_height])
+        _merged, added = _merge_occupied_patch_buffer(
+            base_buffer,
+            width=width,
+            height=height,
+            min_bound=min_bound,
+            patch_buffer=patch_buffer,
+            patch_width=patch_width,
+            patch_height=patch_height,
+            patch_min_bound=patch_min_bound,
+            cell_size=config.cell_size,
+            occupied_value=config.occupied_value,
+        )
+        total_added += added
+        patch_maps.append(
+            {
+                "prim": patch_prim_path,
+                "width": int(patch_width),
+                "height": int(patch_height),
+                "origin": [float(patch_min_bound[0]), float(patch_min_bound[1]), 0.0],
+                "generation_origin": [
+                    float(patch_origin[0]),
+                    float(patch_origin[1]),
+                    float(patch_origin[2]),
+                ],
+                "added_occupied_cells": int(added),
+                "buffer_histogram": _buffer_histogram(patch_buffer),
+            }
+        )
+
+    return patch_maps, total_added
+
+
+def _patch_origin_from_bounds(min_bound, max_bound, config: G1NavStaticMapExportConfig):
+    margin = max(config.cell_size * 2.0, min(config.padding * 0.4, 0.15))
+    origin_y = float(min_bound[1]) + margin
+    upper_y = float(max_bound[1]) - config.cell_size
+    if origin_y > upper_y:
+        origin_y = float(min_bound[1]) + (float(max_bound[1]) - float(min_bound[1])) * 0.5
+
+    return (
+        (float(min_bound[0]) + float(max_bound[0])) * 0.5,
+        origin_y,
+        float(config.origin[2]),
+    )
+
+
+def _merge_occupied_patch_buffer(
+    base_buffer,
+    *,
+    width: int,
+    height: int,
+    min_bound,
+    patch_buffer,
+    patch_width: int,
+    patch_height: int,
+    patch_min_bound,
+    cell_size: float,
+    occupied_value: int,
+):
+    added = 0
+    for patch_y in range(patch_height):
+        for patch_x in range(patch_width):
+            patch_index = patch_y * patch_width + patch_x
+            if int(patch_buffer[patch_index]) != occupied_value:
+                continue
+
+            world_x = float(patch_min_bound[0]) + (patch_x + 0.5) * cell_size
+            world_y = float(patch_min_bound[1]) + (patch_y + 0.5) * cell_size
+            base_x = math.floor((world_x - float(min_bound[0])) / cell_size)
+            base_y = math.floor((world_y - float(min_bound[1])) / cell_size)
+            if not (0 <= base_x < width and 0 <= base_y < height):
+                continue
+
+            base_index = base_y * width + base_x
+            if int(base_buffer[base_index]) != occupied_value:
+                base_buffer[base_index] = occupied_value
+                added += 1
+
+    return base_buffer, added
 
 
 def _relative_bound(bound, origin):

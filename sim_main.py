@@ -26,6 +26,7 @@ from ros2_bridge.g1_nav_static_map_exporter import (
     DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
     DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
     resolve_nav_static_map_collision_exclude_prims,
+    resolve_nav_static_map_patch_prims,
     resolve_nav_static_map_scope,
 )
 from ros2_bridge.g1_nav_cmd_udp_bridge import (
@@ -112,6 +113,7 @@ parser.add_argument("--nav_static_map_z_bounds", type=float, nargs=2, default=(0
 parser.add_argument("--nav_static_map_bound_prim", type=str, default=DEFAULT_NAV_STATIC_MAP_BOUND_PRIM, help="USD prim whose world bounds define the XY occupancy map extent")
 parser.add_argument("--nav_static_map_padding", type=float, default=0.25, help="extra XY padding around --nav_static_map_bound_prim")
 parser.add_argument("--nav_static_map_exclude_prims", type=str, nargs="*", default=list(DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS), help="prim paths to temporarily deactivate while exporting the static map")
+parser.add_argument("--nav_static_map_patch_prims", type=str, nargs="*", default=None, help="additional prim paths to export separately and OR into the static map; omit for task defaults, pass the flag with no values to disable")
 parser.add_argument("--nav_static_map_no_mesh_collision", action="store_true", default=False, help="do not temporarily apply CollisionAPI to static meshes before occupancy map export")
 
 parser.add_argument("--physics_dt", type=float, default=None, help="physics time step, e.g., 0.005")
@@ -448,6 +450,12 @@ def main():
                 args_cli.nav_static_map_bound_prim,
                 args_cli.nav_static_map_exclude_prims,
             )
+            patch_prim_paths = resolve_nav_static_map_patch_prims(
+                args_cli.task,
+                args_cli.nav_static_map_bound_prim,
+                args_cli.nav_static_map_exclude_prims,
+                args_cli.nav_static_map_patch_prims,
+            )
             map_info = export_g1_nav_static_map(
                 G1NavStaticMapExportConfig(
                     output_yaml=args_cli.export_nav_static_map,
@@ -458,6 +466,7 @@ def main():
                     padding=args_cli.nav_static_map_padding,
                     exclude_prim_paths=exclude_prim_paths,
                     collision_exclude_prim_paths=collision_exclude_prim_paths,
+                    patch_prim_paths=patch_prim_paths,
                     apply_collision_to_meshes=not args_cli.nav_static_map_no_mesh_collision,
                 )
             )

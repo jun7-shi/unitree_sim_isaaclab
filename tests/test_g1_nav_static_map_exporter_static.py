@@ -17,9 +17,12 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn("--nav_static_map_bound_prim", sim_main)
         self.assertIn("--nav_static_map_exclude_prims", sim_main)
         self.assertIn("--nav_static_map_no_mesh_collision", sim_main)
+        self.assertIn("--nav_static_map_patch_prims", sim_main)
         self.assertIn('env.scene["robot"].data.root_pos_w', sim_main)
         self.assertIn("resolve_nav_static_map_collision_exclude_prims", sim_main)
+        self.assertIn("resolve_nav_static_map_patch_prims", sim_main)
         self.assertIn("collision_exclude_prim_paths", sim_main)
+        self.assertIn("patch_prim_paths", sim_main)
         self.assertIn("export_g1_nav_static_map", sim_main)
 
     def test_sim_main_exposes_nav_udp_command_bridge_cli(self):
@@ -190,6 +193,94 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         )
 
         self.assertEqual(collision_exclude_prims, ("/World/envs/env_0/Robot",))
+
+    def test_kitchen_static_map_patches_insular_shelf_by_default(self):
+        from ros2_bridge.g1_nav_static_map_exporter import (
+            DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
+            DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+            resolve_nav_static_map_patch_prims,
+        )
+
+        patch_prims = resolve_nav_static_map_patch_prims(
+            "Isaac-Kitchen-G129-Dex1-Wholebody",
+            DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
+            DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+            None,
+        )
+
+        self.assertEqual(
+            patch_prims,
+            ("/World/envs/env_0/Kitchen/Kitchen_InsularShelf_01",),
+        )
+
+    def test_explicit_static_map_patch_prims_override_kitchen_default(self):
+        from ros2_bridge.g1_nav_static_map_exporter import (
+            DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
+            DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+            resolve_nav_static_map_patch_prims,
+        )
+
+        patch_prims = resolve_nav_static_map_patch_prims(
+            "Isaac-Kitchen-G129-Dex1-Wholebody",
+            DEFAULT_NAV_STATIC_MAP_BOUND_PRIM,
+            DEFAULT_NAV_STATIC_MAP_EXCLUDE_PRIMS,
+            ["/World/envs/env_0/Kitchen/CustomPatch"],
+        )
+
+        self.assertEqual(
+            patch_prims,
+            ("/World/envs/env_0/Kitchen/CustomPatch",),
+        )
+
+    def test_static_map_patch_merge_only_or_adds_occupied_cells(self):
+        from ros2_bridge.g1_nav_static_map_exporter import _merge_occupied_patch_buffer
+
+        base_buffer = [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            100,
+            0,
+            0,
+        ]
+        patch_buffer = [
+            0,
+            100,
+            0,
+            100,
+        ]
+
+        merged, added = _merge_occupied_patch_buffer(
+            base_buffer,
+            width=3,
+            height=3,
+            min_bound=(0.0, 0.0, 0.0),
+            patch_buffer=patch_buffer,
+            patch_width=2,
+            patch_height=2,
+            patch_min_bound=(1.0, 0.0, 0.0),
+            cell_size=1.0,
+            occupied_value=100,
+        )
+
+        self.assertEqual(
+            merged,
+            [
+                0,
+                0,
+                100,
+                0,
+                0,
+                100,
+                100,
+                0,
+                0,
+            ],
+        )
+        self.assertEqual(added, 2)
 
     def test_non_kitchen_static_map_keeps_existing_default_scope(self):
         from ros2_bridge.g1_nav_static_map_exporter import (
