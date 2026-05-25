@@ -309,9 +309,19 @@ def _merge_occupied_patch_buffer(
             if int(patch_buffer[patch_index]) != occupied_value:
                 continue
 
-            world_x = float(patch_min_bound[0]) + (patch_x + 0.5) * cell_size
+            world_x = _buffer_x_to_world_x(
+                patch_x,
+                patch_min_bound,
+                patch_width,
+                cell_size,
+            )
             world_y = float(patch_min_bound[1]) + (patch_y + 0.5) * cell_size
-            base_x = math.floor((world_x - float(min_bound[0])) / cell_size)
+            base_x = _world_x_to_buffer_x(
+                world_x,
+                min_bound,
+                width,
+                cell_size,
+            )
             base_y = math.floor((world_y - float(min_bound[1])) / cell_size)
             if not (0 <= base_x < width and 0 <= base_y < height):
                 continue
@@ -322,6 +332,24 @@ def _merge_occupied_patch_buffer(
                 added += 1
 
     return base_buffer, added
+
+
+def _buffer_x_to_world_x(buffer_x: int, min_bound, width: int, cell_size: float) -> float:
+    """Map Isaac OMap's reversed X buffer coordinate into world X."""
+
+    return float(min_bound[0]) + (width - buffer_x - 0.5) * cell_size
+
+
+def _world_x_to_buffer_x(
+    world_x: float,
+    min_bound,
+    width: int,
+    cell_size: float,
+) -> int:
+    """Map world X into Isaac OMap's reversed X buffer coordinate."""
+
+    map_x = math.floor((world_x - float(min_bound[0])) / cell_size)
+    return width - 1 - map_x
 
 
 def _relative_bound(bound, origin):
@@ -681,7 +709,10 @@ def _write_pgm(
         stream.write(f"P5\n{width} {height}\n255\n".encode("ascii"))
         # ROS map images are top-down; write max-Y rows first.
         for y in range(height - 1, -1, -1):
-            row = bytearray(normalize(buffer[y * width + x]) for x in range(width))
+            row = bytearray(
+                normalize(buffer[y * width + (width - 1 - x)])
+                for x in range(width)
+            )
             stream.write(row)
 
 

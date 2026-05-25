@@ -315,11 +315,11 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
             merged,
             [
                 0,
-                0,
                 100,
                 0,
                 0,
                 100,
+                0,
                 100,
                 0,
                 0,
@@ -361,7 +361,7 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
             data = pgm_path.read_bytes()
 
         self.assertTrue(data.startswith(b"P5\n2 2\n255\n"))
-        self.assertEqual(data[-4:], bytes([205, 123, 0, 254]))
+        self.assertEqual(data[-4:], bytes([123, 205, 254, 0]))
 
 
 if __name__ == "__main__":
