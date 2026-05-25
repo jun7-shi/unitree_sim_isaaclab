@@ -13,6 +13,7 @@ from isaaclab.utils.buffers import CircularBuffer,DelayBuffer
 import os
 import ast
 from ros2_bridge.g1_nav_runtime_modes import (
+    action_provider_render_interval,
     should_compute_action_observations,
     should_render_action_provider,
 )
@@ -29,6 +30,7 @@ class DDSRLActionProvider(ActionProvider):
         self.wh = args_cli.enable_wholebody_dds
         self.nav_minimal_dds = bool(getattr(args_cli, "nav_minimal_dds", False))
         self.nav_render_required = should_render_action_provider(args_cli)
+        self.nav_render_interval = action_provider_render_interval(args_cli)
         self.nav_observation_required = should_compute_action_observations(args_cli)
         self.policy_path = f"{project_root}/"+args_cli.model_path
         self.env = env
@@ -448,7 +450,11 @@ class DDSRLActionProvider(ActionProvider):
                 self.env.sim.step(render=False)                              
                 self.env.scene.update(dt=self.env.physics_dt)                    
 
-            if self.nav_render_required:
+            self.sim_step_counter += 1
+            if self.nav_render_required and (
+                self.nav_render_interval <= 1
+                or self.sim_step_counter % self.nav_render_interval == 0
+            ):
                 self.env.sim.render()
             if self.nav_observation_required:
                 self.env.observation_manager.compute()

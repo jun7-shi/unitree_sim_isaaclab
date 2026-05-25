@@ -27,9 +27,16 @@ when the active task exposes a depth-capable `front_camera`.
 `--disable_image_server` skips the unrelated teleimager ZMQ/WebRTC image server.
 `--nav_minimal_dds` starts only the robot state, run command, reset pose, and
 sim-state DDS objects needed for Nav2 command driving; it avoids hand/reward DDS
-publishers that are not part of the navigation loop. In GUI mode it keeps the
-original Unitree walking loop's render and observation-manager updates so idle
-standing behavior matches the upstream simulator.
+publishers that are not part of the navigation loop. In GUI mode the V1
+navigation path also skips the original RGB camera observation-manager update,
+because static-map navigation does not consume those images.
+
+For GUI V1 performance, `--nav_minimal_dds` renders the action-provider view
+every 4 provider ticks by default. Use `--nav_action_render_interval 1` when
+debugging every rendered frame, or use a larger interval when simulator
+throughput matters more than GUI smoothness. This knob does not apply when
+`--enable_nav_ros_pointcloud` is active; the point cloud ROS graph keeps
+rendering every tick so the render product stays current.
 
 Add `--no_render` for the V1.0 static-map TF/odom path when running without a
 GUI. In that mode the walking action provider skips regular render and

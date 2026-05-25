@@ -106,6 +106,7 @@ parser.add_argument("--nav_udp_cmd_host", type=str, default="127.0.0.1", help="U
 parser.add_argument("--nav_udp_cmd_port", type=int, default=18080, help="UDP port for the Nav2 command bridge")
 parser.add_argument("--nav_udp_cmd_stale_timeout", type=float, default=0.5, help="seconds before the Nav2 UDP command bridge writes a zero command")
 parser.add_argument("--nav_minimal_dds", action="store_true", default=False, help="start only the DDS objects required by Nav2 command driving")
+parser.add_argument("--nav_action_render_interval", type=int, default=None, help="manual env.sim.render interval for nav_minimal_dds GUI runs; defaults to 4, ignored by pointcloud mode")
 parser.add_argument("--export_nav_static_map", type=str, default="", help="export a Nav2 static occupancy map YAML/PGM from the current Unitree IsaacLab env and exit")
 parser.add_argument("--nav_static_map_cell_size", type=float, default=0.05, help="cell size in meters for --export_nav_static_map")
 parser.add_argument("--nav_static_map_origin", type=float, nargs=3, default=None, metavar=("X", "Y", "Z"), help="free start point for Isaac Sim occupancy map generation; defaults to the robot start x/y with z=0.1")

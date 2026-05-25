@@ -8,19 +8,35 @@ def _enabled(args_cli, name):
 
 
 def should_render_action_provider(args_cli):
-    """Keep GUI runs on the original render path; skip only for no-render minimal nav."""
-    return (
-        not _enabled(args_cli, "nav_minimal_dds")
-        or _enabled(args_cli, "enable_nav_ros_pointcloud")
-        or not _enabled(args_cli, "no_render")
-    )
+    """Return whether the action provider should manually render sim frames."""
+    return action_provider_render_interval(args_cli) > 0
+
+
+def action_provider_render_interval(args_cli):
+    """Return how often the action provider should call env.sim.render().
+
+    The Wholebody action provider owns the manual render call. In V1 nav mode,
+    rendering every control tick dominates the single-env simulator loop, while
+    the Navigation stack only needs a responsive GUI view. PointCloud2 mode is
+    the exception because the ROS camera graph needs every render tick.
+    """
+    if _enabled(args_cli, "enable_nav_ros_pointcloud"):
+        return 1
+    if _enabled(args_cli, "no_render"):
+        return 0
+
+    configured_interval = getattr(args_cli, "nav_action_render_interval", None)
+    if configured_interval is not None:
+        return max(1, int(configured_interval))
+
+    if _enabled(args_cli, "nav_minimal_dds"):
+        return 4
+    return 1
 
 
 def should_compute_action_observations(args_cli):
-    """Keep GUI minimal nav close to the original Unitree control loop."""
-    return not _enabled(args_cli, "nav_minimal_dds") or not _enabled(
-        args_cli, "no_render"
-    )
+    """Skip original camera observation updates in navigation-only DDS mode."""
+    return not _enabled(args_cli, "nav_minimal_dds")
 
 
 def should_update_nav_ros_app(args_cli, nav_ros_bridge_enabled):
