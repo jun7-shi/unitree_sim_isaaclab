@@ -31,12 +31,18 @@ publishers that are not part of the navigation loop. In GUI mode the V1
 navigation path also skips the original RGB camera observation-manager update,
 because static-map navigation does not consume those images.
 
-For GUI V1 performance, `--nav_minimal_dds` renders the action-provider view
-every 4 provider ticks by default. Use `--nav_action_render_interval 1` when
-debugging every rendered frame, or use a larger interval when simulator
-throughput matters more than GUI smoothness. This knob does not apply when
+For GUI V1 performance debugging, `--nav_minimal_dds` renders the
+action-provider view every provider tick by default. Use
+`--nav_action_render_interval 4` or a larger interval only when intentionally
+trading viewport smoothness for loop throughput. This knob does not apply when
 `--enable_nav_ros_pointcloud` is active; the point cloud ROS graph keeps
 rendering every tick so the render product stays current.
+
+With profiling enabled, the Wholebody action provider prints
+`[NavActionProfile]` averages every `--profile_interval` provider ticks. Use
+that line to distinguish policy inference, command mixing, PhysX stepping,
+scene update, render, and observation-manager costs before changing simulator
+configuration.
 
 Add `--no_render` for the V1.0 static-map TF/odom path when running without a
 GUI. In that mode the walking action provider skips regular render and

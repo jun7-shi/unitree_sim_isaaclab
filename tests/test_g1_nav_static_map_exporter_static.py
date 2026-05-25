@@ -78,6 +78,10 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
         self.assertIn("enable_nav_ros_pointcloud", runtime_modes)
         self.assertIn("no_render", runtime_modes)
         self.assertIn("self.nav_render_required", action_provider)
+        self.assertIn("[NavActionProfile]", action_provider)
+        self.assertIn("physics_step", action_provider)
+        self.assertIn("scene_update", action_provider)
+        self.assertIn("render", action_provider)
         self.assertLess(
             action_provider.index("self.nav_render_required"),
             action_provider.index("self.env.sim.render()"),

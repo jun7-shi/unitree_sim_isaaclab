@@ -15,10 +15,9 @@ def should_render_action_provider(args_cli):
 def action_provider_render_interval(args_cli):
     """Return how often the action provider should call env.sim.render().
 
-    The Wholebody action provider owns the manual render call. In V1 nav mode,
-    rendering every control tick dominates the single-env simulator loop, while
-    the Navigation stack only needs a responsive GUI view. PointCloud2 mode is
-    the exception because the ROS camera graph needs every render tick.
+    The Wholebody action provider owns the manual render call. GUI runs default
+    to every provider tick so the viewport FPS reflects actual loop throughput.
+    PointCloud2 mode also needs every render tick for render-product updates.
     """
     if _enabled(args_cli, "enable_nav_ros_pointcloud"):
         return 1
@@ -29,8 +28,6 @@ def action_provider_render_interval(args_cli):
     if configured_interval is not None:
         return max(1, int(configured_interval))
 
-    if _enabled(args_cli, "nav_minimal_dds"):
-        return 4
     return 1
 
 

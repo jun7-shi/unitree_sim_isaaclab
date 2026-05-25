@@ -32,6 +32,15 @@ class DDSRLActionProvider(ActionProvider):
         self.nav_render_required = should_render_action_provider(args_cli)
         self.nav_render_interval = action_provider_render_interval(args_cli)
         self.nav_observation_required = should_compute_action_observations(args_cli)
+        self.nav_profile_enabled = bool(
+            getattr(args_cli, "enable_profiling", False)
+        )
+        self.nav_profile_interval = max(
+            1, int(getattr(args_cli, "profile_interval", 500))
+        )
+        self._nav_profile_counter = 0
+        self._nav_profile_totals = {}
+        self._profile_perf_counter = time.perf_counter
         self.policy_path = f"{project_root}/"+args_cli.model_path
         self.env = env
         # Initialize DDS communication
@@ -381,12 +390,57 @@ class DDSRLActionProvider(ActionProvider):
         current_actor_obs = self.compute_observations()
         action = self.policy(current_actor_obs)
         return action
+
+    def _record_nav_profile(self, timings):
+        if not self.nav_profile_enabled:
+            return
+
+        self._nav_profile_counter += 1
+        for name, value in timings.items():
+            self._nav_profile_totals[name] = (
+                self._nav_profile_totals.get(name, 0.0) + value
+            )
+
+        if self._nav_profile_counter < self.nav_profile_interval:
+            return
+
+        count = self._nav_profile_counter
+        fields = [
+            "total",
+            "policy",
+            "command_mix",
+            "physics_target",
+            "physics_write",
+            "physics_step",
+            "scene_update",
+            "render",
+            "observation",
+        ]
+        parts = []
+        for name in fields:
+            avg_ms = self._nav_profile_totals.get(name, 0.0) * 1000.0 / count
+            parts.append(f"{name}={avg_ms:.1f}ms")
+        print(
+            f"[NavActionProfile] avg over {count} provider ticks: "
+            + ", ".join(parts)
+        )
+        self._nav_profile_counter = 0
+        self._nav_profile_totals.clear()
+
     def get_action(self, env) -> Optional[torch.Tensor]:
         """Get action from DDS"""
+        profile_enabled = self.nav_profile_enabled
+        profile_clock = self._profile_perf_counter
+        timings = {} if profile_enabled else None
+        total_start = profile_clock() if profile_enabled else 0.0
         try:
             full_action = self._full_action_buf
             full_action.zero_()
+            policy_start = profile_clock() if profile_enabled else 0.0
             action_data = self.run_policy()
+            if profile_enabled:
+                timings["policy"] = profile_clock() - policy_start
+                command_mix_start = profile_clock()
 
             # RL 输出与腰部默认位姿
             full_action[self.action_to_indices] = action_data
@@ -443,21 +497,57 @@ class DDSRLActionProvider(ActionProvider):
                             full_action.index_copy_(0, self._inspire_target_idx_t, base_vals)
                             special_vals = self._inspire_buf.index_select(0, self._inspire_special_source_idx_t) * self._inspire_special_scales_t
                             full_action.index_copy_(0, self._inspire_special_target_idx_t, special_vals)
+            if profile_enabled:
+                timings["command_mix"] = profile_clock() - command_mix_start
+                physics_target_time = 0.0
+                physics_write_time = 0.0
+                physics_step_time = 0.0
+                scene_update_time = 0.0
             # 同步仿真多步
             for _ in range(4):
+                section_start = profile_clock() if profile_enabled else 0.0
                 self.env.scene["robot"].set_joint_position_target(full_action) 
+                if profile_enabled:
+                    physics_target_time += profile_clock() - section_start
+                    section_start = profile_clock()
                 self.env.scene.write_data_to_sim()                           
+                if profile_enabled:
+                    physics_write_time += profile_clock() - section_start
+                    section_start = profile_clock()
                 self.env.sim.step(render=False)                              
+                if profile_enabled:
+                    physics_step_time += profile_clock() - section_start
+                    section_start = profile_clock()
                 self.env.scene.update(dt=self.env.physics_dt)                    
+                if profile_enabled:
+                    scene_update_time += profile_clock() - section_start
+            if profile_enabled:
+                timings["physics_target"] = physics_target_time
+                timings["physics_write"] = physics_write_time
+                timings["physics_step"] = physics_step_time
+                timings["scene_update"] = scene_update_time
 
             self.sim_step_counter += 1
             if self.nav_render_required and (
                 self.nav_render_interval <= 1
                 or self.sim_step_counter % self.nav_render_interval == 0
             ):
+                render_start = profile_clock() if profile_enabled else 0.0
                 self.env.sim.render()
+                if profile_enabled:
+                    timings["render"] = profile_clock() - render_start
+            elif profile_enabled:
+                timings["render"] = 0.0
             if self.nav_observation_required:
+                observation_start = profile_clock() if profile_enabled else 0.0
                 self.env.observation_manager.compute()
+                if profile_enabled:
+                    timings["observation"] = profile_clock() - observation_start
+            elif profile_enabled:
+                timings["observation"] = 0.0
+            if profile_enabled:
+                timings["total"] = profile_clock() - total_start
+                self._record_nav_profile(timings)
             
         except Exception as e:
             print(f"[{self.name}] Get DDS action failed: {e}")

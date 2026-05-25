@@ -19,7 +19,7 @@ class G1NavRuntimeModeTests(unittest.TestCase):
         self.assertTrue(should_render_action_provider(args))
         self.assertFalse(should_compute_action_observations(args))
 
-    def test_gui_minimal_nav_throttles_action_provider_rendering_by_default(self):
+    def test_gui_minimal_nav_keeps_every_render_tick_by_default(self):
         from ros2_bridge.g1_nav_runtime_modes import action_provider_render_interval
 
         args = SimpleNamespace(
@@ -29,7 +29,19 @@ class G1NavRuntimeModeTests(unittest.TestCase):
             nav_action_render_interval=None,
         )
 
-        self.assertEqual(action_provider_render_interval(args), 4)
+        self.assertEqual(action_provider_render_interval(args), 1)
+
+    def test_gui_minimal_nav_can_keep_every_render_tick_for_viewport_fps(self):
+        from ros2_bridge.g1_nav_runtime_modes import action_provider_render_interval
+
+        args = SimpleNamespace(
+            nav_minimal_dds=True,
+            enable_nav_ros_pointcloud=False,
+            no_render=False,
+            nav_action_render_interval=1,
+        )
+
+        self.assertEqual(action_provider_render_interval(args), 1)
 
     def test_explicit_nav_action_render_interval_overrides_default(self):
         from ros2_bridge.g1_nav_runtime_modes import action_provider_render_interval
