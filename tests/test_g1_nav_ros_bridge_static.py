@@ -39,6 +39,18 @@ class G1NavRosBridgeStaticTests(unittest.TestCase):
                 [-3.9, -2.81811, 0.8],
             )
 
+    def test_auto_map_odom_rotation_uses_initial_chassis_world_orientation(self):
+        from ros2_bridge.g1_nav_tf_odom_bridge import resolve_map_odom_rotation
+
+        with patch(
+            "ros2_bridge.g1_nav_tf_odom_bridge._find_stage_world_rotation",
+            return_value=[0.0, 0.0, 0.984807753, 0.173648178],
+        ):
+            self.assertEqual(
+                resolve_map_odom_rotation("/World/envs/env_0/Robot/pelvis"),
+                [0.0, 0.0, 0.984807753, 0.173648178],
+            )
+
     def test_configured_map_odom_translation_overrides_auto_stage_lookup(self):
         from ros2_bridge.g1_nav_tf_odom_bridge import resolve_map_odom_translation
 
@@ -52,6 +64,21 @@ class G1NavRosBridgeStaticTests(unittest.TestCase):
                     configured_translation=(1, 2, 3),
                 ),
                 [1.0, 2.0, 3.0],
+            )
+
+    def test_configured_map_odom_rotation_overrides_auto_stage_lookup(self):
+        from ros2_bridge.g1_nav_tf_odom_bridge import resolve_map_odom_rotation
+
+        with patch(
+            "ros2_bridge.g1_nav_tf_odom_bridge._find_stage_world_rotation",
+            return_value=[0.0, 0.0, 0.984807753, 0.173648178],
+        ):
+            self.assertEqual(
+                resolve_map_odom_rotation(
+                    "/World/envs/env_0/Robot/pelvis",
+                    configured_rotation=(0, 0, 0, 1),
+                ),
+                [0.0, 0.0, 0.0, 1.0],
             )
 
     def test_bridge_helper_builds_tf_odom_graph(self):
@@ -69,6 +96,8 @@ class G1NavRosBridgeStaticTests(unittest.TestCase):
         self.assertIn('odom_frame: str = "odom"', bridge)
         self.assertIn('base_frame: str = "base_link"', bridge)
         self.assertIn('odom_topic: str = "/odom"', bridge)
+        self.assertIn("map_odom_rotation", bridge)
+        self.assertIn("resolve_map_odom_rotation", bridge)
         self.assertIn("usdrt.Sdf.Path(robot_prim_path)", bridge)
 
     def test_clock_helper_matches_nvidia_clock_shortcut(self):
@@ -94,6 +123,7 @@ class G1NavRosBridgeStaticTests(unittest.TestCase):
         self.assertIn("nav_ros_map_frame", sim_main)
         self.assertIn("nav_ros_odom_topic", sim_main)
         self.assertIn("nav_ros_map_odom_translation", sim_main)
+        self.assertIn("nav_ros_map_odom_rotation", sim_main)
 
     def test_bridge_doc_contains_launch_and_verification_commands(self):
         doc = (ROOT / "docs/humanoid_nav_ros_bridge.md").read_text(
@@ -112,6 +142,7 @@ class G1NavRosBridgeStaticTests(unittest.TestCase):
         self.assertIn("ros2 topic hz /odom", doc)
         self.assertIn("map -> odom -> base_link", doc)
         self.assertIn("--nav_ros_map_odom_translation X Y Z", doc)
+        self.assertIn("--nav_ros_map_odom_rotation X Y Z W", doc)
 
 
 if __name__ == "__main__":

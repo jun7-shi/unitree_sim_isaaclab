@@ -64,10 +64,11 @@ map -> odom -> base_link
 ```
 
 `/odom` is local odometry and starts near zero at bridge creation. The bridge
-sets `map -> odom` to the robot chassis world position so `map -> base_link`
-matches the Isaac Sim environment position. Override that initial map alignment
-with `--nav_ros_map_odom_translation X Y Z` when using a static map with a
-different origin.
+sets `map -> odom` to the robot chassis world pose so `map -> base_link`
+matches the Isaac Sim environment position and orientation. Override that
+initial map alignment with `--nav_ros_map_odom_translation X Y Z` and
+`--nav_ros_map_odom_rotation X Y Z W` when using a static map with a different
+origin or yaw.
 
 Default frame and topic contract:
 
