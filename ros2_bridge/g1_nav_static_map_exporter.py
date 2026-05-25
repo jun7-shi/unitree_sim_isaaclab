@@ -20,6 +20,7 @@ KITCHEN_NAV_STATIC_MAP_BOUND_PRIM = "/World/envs/env_0/Kitchen"
 KITCHEN_NAV_STATIC_MAP_COLLISION_EXCLUDE_PRIMS = ("/World/envs/env_0/Robot",)
 KITCHEN_NAV_STATIC_MAP_PATCH_PRIMS = (
     "/World/envs/env_0/Kitchen/Kitchen_InsularShelf_01",
+    "/World/envs/env_0/Kitchen/Kitchen_Cabinet001_01",
 )
 
 

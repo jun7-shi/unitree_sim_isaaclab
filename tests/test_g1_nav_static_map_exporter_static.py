@@ -210,7 +210,10 @@ class G1NavStaticMapExporterStaticTests(unittest.TestCase):
 
         self.assertEqual(
             patch_prims,
-            ("/World/envs/env_0/Kitchen/Kitchen_InsularShelf_01",),
+            (
+                "/World/envs/env_0/Kitchen/Kitchen_InsularShelf_01",
+                "/World/envs/env_0/Kitchen/Kitchen_Cabinet001_01",
+            ),
         )
 
     def test_explicit_static_map_patch_prims_override_kitchen_default(self):
