@@ -95,18 +95,15 @@ class CameraPresets:
         return CameraBaseCfg.get_camera_config()
     @classmethod
     def g1_nav_depth_camera(cls) -> CameraCfg:
-        """RGBD camera mounted on the package-owned G1 navigation USD."""
+        """RGBD variant of the default G1 front camera."""
         return CameraBaseCfg.get_camera_config(
-            prim_path="/World/envs/env_.*/Robot/d435_link/head_d435_depth_camera",
+            prim_path="/World/envs/env_.*/Robot/d435_link/front_cam",
             height=480,
             width=640,
             update_period=0.02,
             data_types=["rgb", "depth"],
-            focal_length=18.0,
-            focus_distance=400.0,
-            horizontal_aperture=20.0,
             clipping_range=(0.05, 5.0),
-            spawn_camera=False,
+            spawn_camera=True,
         )
     @classmethod
     def h12_front_camera(cls) -> CameraCfg:

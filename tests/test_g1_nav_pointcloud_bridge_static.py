@@ -27,6 +27,11 @@ class G1NavPointCloudBridgeStaticTests(unittest.TestCase):
         self.assertIn('type", "depth_pcl"', bridge)
         self.assertIn("renderProductPath", bridge)
         self.assertIn('camera_prim_path: str | None = None', bridge)
+        self.assertIn(
+            'return "/World/envs/env_0/Robot/d435_link/front_cam"',
+            bridge,
+        )
+        self.assertNotIn("head_d435_depth_camera", bridge)
 
     def test_sim_main_exposes_nav_pointcloud_bridge_flag(self):
         sim_main = (ROOT / "sim_main.py").read_text(encoding="utf-8")

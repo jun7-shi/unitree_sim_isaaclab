@@ -35,7 +35,7 @@ def resolve_camera_prim_path(env, camera_name: str = "front_camera") -> str:
         if cfg_prim_path:
             return cfg_prim_path.replace("env_.*", "env_0")
 
-    return "/World/envs/env_0/Robot/d435_link/head_d435_depth_camera"
+    return "/World/envs/env_0/Robot/d435_link/front_cam"
 
 
 def create_g1_nav_pointcloud_graph(
