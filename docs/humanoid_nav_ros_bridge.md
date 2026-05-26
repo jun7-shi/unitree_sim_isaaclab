@@ -27,6 +27,19 @@ RGBD image bridge. For V1.5 RGBD perception, use
 `--enable_nav_ros_rgbd_images`; Isaac Sim publishes RGB/depth images and the ROS
 workspace locally downsamples depth into `/g1/head_rgbd/points` for Nav2
 VoxelLayer.
+Add `--enable_nav_ros_self_filter_tf` with the RGBD image bridge when using the
+ROS workspace's dynamic robot self-filter. The bridge publishes selected G1 arm
+link poses with Isaac Sim's `ROS2PublishTransformTree` node, rooted at the
+resolved chassis prim. The ROS profile consumes those poses as `pelvis -> link`
+transforms and combines them with the configured front-camera extrinsic.
+
+V1.5 RGBD self-filter add-on flags:
+
+```bash
+--enable_nav_ros_rgbd_images \
+--enable_nav_ros_self_filter_tf
+```
+
 `--disable_image_server` skips the unrelated teleimager ZMQ/WebRTC image server.
 `--nav_minimal_dds` starts only the robot state, run command, reset pose, and
 sim-state DDS objects needed for Nav2 command driving; it avoids hand/reward DDS
@@ -79,6 +92,8 @@ map -> odom -> base_link
 /g1/head_rgbd/camera_info sensor_msgs/CameraInfo
 /g1/head_rgbd/rgb/image_raw sensor_msgs/Image
 /g1/head_rgbd/depth/image_raw sensor_msgs/Image
+pelvis -> left_wrist_yaw_link
+pelvis -> right_wrist_yaw_link
 ```
 
 `/odom` is local odometry and starts near zero at bridge creation. The bridge
@@ -118,6 +133,8 @@ ros2 topic echo --once /g1/head_rgbd/camera_info.header.frame_id
 ros2 topic hz /g1/head_rgbd/rgb/image_raw
 ros2 topic hz /g1/head_rgbd/depth/image_raw
 ros2 topic echo --once /g1/head_rgbd/depth/image_raw.header.frame_id
+ros2 run tf2_ros tf2_echo pelvis left_wrist_yaw_link
+ros2 run tf2_ros tf2_echo pelvis right_wrist_yaw_link
 ```
 
 Expected values:

@@ -33,6 +33,7 @@ from ros2_bridge.g1_nav_cmd_udp_bridge import (
     G1NavUdpCmdBridge,
     G1NavUdpCmdBridgeConfig,
 )
+from ros2_bridge.g1_nav_self_filter_tf_bridge import DEFAULT_SELF_FILTER_LINK_NAMES
 from ros2_bridge.g1_nav_runtime_modes import should_update_nav_ros_app
 # add command line arguments
 parser = argparse.ArgumentParser(description="Unitree Simulation")
@@ -76,6 +77,11 @@ parser.add_argument("--nav_ros_odom_frame", type=str, default="odom", help="Nav2
 parser.add_argument("--nav_ros_base_frame", type=str, default="base_link", help="Nav2 base frame id")
 parser.add_argument("--nav_ros_odom_topic", type=str, default="/odom", help="ROS2 odometry topic for Nav2")
 parser.add_argument("--nav_ros_tf_topic", type=str, default="tf", help="ROS2 TF topic for Nav2")
+parser.add_argument("--enable_nav_ros_self_filter_tf", action="store_true", default=False, help="enable ROS2 TF bridge for G1 self-filter arm links")
+parser.add_argument("--nav_ros_self_filter_tf_graph_path", type=str, default="/ActionGraph/HumanoidNavSelfFilterTf", help="OmniGraph path for the navigation self-filter link TF bridge")
+parser.add_argument("--nav_ros_self_filter_tf_topic", type=str, default="tf", help="ROS2 TF topic for G1 self-filter links")
+parser.add_argument("--nav_ros_self_filter_tf_parent_prim_path", type=str, default=None, help="explicit parent prim for G1 self-filter link TF; defaults to the resolved chassis prim")
+parser.add_argument("--nav_ros_self_filter_tf_links", type=str, default=",".join(DEFAULT_SELF_FILTER_LINK_NAMES), help="comma-separated G1 link prim names to publish for RGBD self-filtering")
 parser.add_argument(
     "--nav_ros_map_odom_translation",
     type=float,
@@ -526,6 +532,30 @@ def main():
         except Exception as e:
             print(f"[nav_ros] failed to enable TF/odom bridge: {e}")
             return
+    if args_cli.enable_nav_ros_self_filter_tf:
+        try:
+            from ros2_bridge.g1_nav_self_filter_tf_bridge import (
+                G1NavSelfFilterTfBridgeConfig,
+                create_g1_nav_self_filter_tf_graph,
+                parse_self_filter_link_names,
+            )
+
+            self_filter_tf_info = create_g1_nav_self_filter_tf_graph(
+                env,
+                G1NavSelfFilterTfBridgeConfig(
+                    graph_path=args_cli.nav_ros_self_filter_tf_graph_path,
+                    parent_prim_path=args_cli.nav_ros_self_filter_tf_parent_prim_path,
+                    link_names=parse_self_filter_link_names(
+                        args_cli.nav_ros_self_filter_tf_links
+                    ),
+                    tf_topic=args_cli.nav_ros_self_filter_tf_topic,
+                    node_namespace=args_cli.nav_ros_node_namespace,
+                ),
+            )
+            print(f"[nav_ros] self-filter link TF bridge enabled: {self_filter_tf_info}")
+        except Exception as e:
+            print(f"[nav_ros] failed to enable self-filter link TF bridge: {e}")
+            return
     if args_cli.enable_nav_ros_pointcloud:
         try:
             from ros2_bridge.g1_nav_pointcloud_bridge import (
@@ -578,6 +608,7 @@ def main():
     nav_ros_bridge_enabled = (
         args_cli.enable_nav_ros_clock
         or args_cli.enable_nav_ros_tf_odom
+        or args_cli.enable_nav_ros_self_filter_tf
         or args_cli.enable_nav_ros_pointcloud
         or args_cli.enable_nav_ros_rgbd_images
     )
