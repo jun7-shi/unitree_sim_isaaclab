@@ -48,7 +48,7 @@ class G1NavTaskStaticTests(unittest.TestCase):
         )
         self.assertNotIn("head_d435_depth_camera", camera_configs)
         self.assertIn('data_types=["rgb", "depth"]', camera_configs)
-        self.assertIn("spawn_camera=True", camera_configs)
+        self.assertIn("spawn_camera=False", camera_configs)
 
     def test_nav_task_is_registered_and_imported(self):
         task_init = (ROOT / "tasks/g1_tasks/__init__.py").read_text(encoding="utf-8")
