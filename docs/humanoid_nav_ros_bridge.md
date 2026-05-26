@@ -100,7 +100,7 @@ tf_topic: tf
 camera_info_topic: /g1/head_rgbd/camera_info
 rgb_topic: /g1/head_rgbd/rgb/image_raw
 depth_topic: /g1/head_rgbd/depth/image_raw
-camera_frame: g1_head_d435_depth_optical_frame
+camera_frame: g1_front_rgbd_optical_frame
 ```
 
 ## Verification
@@ -125,8 +125,8 @@ Expected values:
 ```text
 /odom.header.frame_id: odom
 /odom.child_frame_id: base_link
-/g1/head_rgbd/camera_info.header.frame_id: g1_head_d435_depth_optical_frame
-/g1/head_rgbd/depth/image_raw.header.frame_id: g1_head_d435_depth_optical_frame
+/g1/head_rgbd/camera_info.header.frame_id: g1_front_rgbd_optical_frame
+/g1/head_rgbd/depth/image_raw.header.frame_id: g1_front_rgbd_optical_frame
 ```
 
 ## Legacy Direct PointCloud2 Bridge

@@ -20,7 +20,7 @@ class G1NavRgbdImageBridgeStaticTests(unittest.TestCase):
         self.assertIn('rgb_topic: str = "/g1/head_rgbd/rgb/image_raw"', bridge)
         self.assertIn('depth_topic: str = "/g1/head_rgbd/depth/image_raw"', bridge)
         self.assertIn('camera_info_topic: str = "/g1/head_rgbd/camera_info"', bridge)
-        self.assertIn('frame_id: str = "g1_head_d435_depth_optical_frame"', bridge)
+        self.assertIn('frame_id: str = "g1_front_rgbd_optical_frame"', bridge)
         self.assertIn('inputs:type", "rgb"', bridge)
         self.assertIn('inputs:type", "depth"', bridge)
         self.assertNotIn("depth_pcl", bridge)

@@ -1,6 +1,6 @@
 # Copyright (c) 2025, Unitree Robotics Co., Ltd. All Rights Reserved.
 # License: Apache License, Version 2.0
-"""Isaac Sim ROS2 PointCloud2 graph for the G1 head RGBD camera."""
+"""Isaac Sim ROS2 PointCloud2 graph for the G1 front RGBD camera."""
 
 from dataclasses import dataclass
 
@@ -17,7 +17,7 @@ class G1NavPointCloudBridgeConfig:
     camera_prim_path: str | None = None
     pointcloud_topic: str = "/g1/head_rgbd/points"
     camera_info_topic: str = "/g1/head_rgbd/camera_info"
-    frame_id: str = "g1_head_d435_depth_optical_frame"
+    frame_id: str = "g1_front_rgbd_optical_frame"
     node_namespace: str = ""
     width: int = 640
     height: int = 480
@@ -42,7 +42,7 @@ def create_g1_nav_pointcloud_graph(
     env,
     config: G1NavPointCloudBridgeConfig | None = None,
 ) -> dict[str, str]:
-    """Create the ROS2 PointCloud2 OmniGraph for the G1 head RGBD camera."""
+    """Create the ROS2 PointCloud2 OmniGraph for the G1 front RGBD camera."""
     import omni.graph.core as og
 
     config = config or G1NavPointCloudBridgeConfig()

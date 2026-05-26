@@ -150,7 +150,7 @@ class KitchenG129Dex1WholebodyEnvCfg(ManagerBasedRLEnvCfg):
 
 @configclass
 class KitchenG129Dex1WholebodyNavEnvCfg(KitchenG129Dex1WholebodyEnvCfg):
-    """Navigation-ready Kitchen G1 task with a head RGBD camera."""
+    """Navigation-ready Kitchen G1 task with a front RGBD camera."""
 
     scene: KitchenNavSceneCfg = KitchenNavSceneCfg(
         num_envs=1,

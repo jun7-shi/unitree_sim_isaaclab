@@ -21,7 +21,7 @@ class G1NavPointCloudBridgeStaticTests(unittest.TestCase):
         self.assertIn('pointcloud_topic: str = "/g1/head_rgbd/points"', bridge)
         self.assertIn('camera_info_topic: str = "/g1/head_rgbd/camera_info"', bridge)
         self.assertIn(
-            'frame_id: str = "g1_head_d435_depth_optical_frame"',
+            'frame_id: str = "g1_front_rgbd_optical_frame"',
             bridge,
         )
         self.assertIn('type", "depth_pcl"', bridge)
@@ -41,6 +41,7 @@ class G1NavPointCloudBridgeStaticTests(unittest.TestCase):
         self.assertIn("G1NavPointCloudBridgeConfig", sim_main)
         self.assertIn("nav_ros_pointcloud_topic", sim_main)
         self.assertIn("nav_ros_camera_frame", sim_main)
+        self.assertIn('default="g1_front_rgbd_optical_frame"', sim_main)
 
     def test_bridge_doc_contains_pointcloud_launch_and_verification(self):
         doc = (ROOT / "docs/humanoid_nav_ros_bridge.md").read_text(
